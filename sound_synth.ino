@@ -1,6 +1,6 @@
 //#include <MIDI.h>
-//#include "WiFi.h"
-//#include <HardwareSerial.h>
+#include "WiFi.h"
+#include <HardwareSerial.h>
 #include "SynthVoice.h"
 #define ANALOG_IN 36
 #define RED_BUTTON 4
@@ -8,12 +8,12 @@
 #define YELLOW_BUTTON 2
 #define AUDIOBUFSIZE 64000
 #define SAMPLE_RATE 8000
-#define NUM_VOICES 16
+#define NUM_VOICES 8
 #define WTLEN 256
 #define MIDI_COMMAND 128
 hw_timer_t * timer = NULL;
 volatile long t = 0;
-//HardwareSerial hSerial(0);
+HardwareSerial hSerial(2);
 
 int8_t fp_sinWaveTable[WTLEN];
 int8_t fp_sawWaveTable[WTLEN];
@@ -32,7 +32,7 @@ void initFpSin()
   {
     fp_sinWaveTable[i] = (int8_t)(127*(sin(2*(PI/(float)WTLEN)*i)));
   }
-  
+  return;
 }
 
 void initFpTri()
@@ -89,7 +89,7 @@ void IRAM_ATTR onTimer() {
   {
     s = s + (int32_t)(voices[i].Process() ); 
   }
-  data = (s+128*NUM_VOICES)>>5;
+  data = (s+128*NUM_VOICES)/NUM_VOICES;
     //s = ((int32_t)nsinosc.Process())+128;
      //s = s+(fpsinosc[i].Process())>>16;
      //s = nsinosc.Process()>>10;
@@ -102,9 +102,14 @@ void IRAM_ATTR onTimer() {
   t_counter++;
   avg_time_micros = t_diff;
 }
+//TaskHandle_t Task1;
 void setup()
 {
+  
+  WiFi.mode(WIFI_OFF);
+  btStop();
   Serial.begin(115200);
+  hSerial.begin(31250,SERIAL_8N1,22,19);
   //hSerial.begin(115200);
   pinMode(LED,OUTPUT);
   digitalWrite(LED,HIGH);
@@ -115,23 +120,19 @@ void setup()
   {
     voices_notes[i] = -1;
   }
-  //WiFi.mode(WIFI_OFF);
-  btStop();
+  
   initFpSaw();
   initFpSin();
   initFpSqu();
-  initFpTri();
-  pinMode(RED_BUTTON,INPUT);
-  pinMode(YELLOW_BUTTON,INPUT);
-  pinMode(ANALOG_IN,INPUT);  
+  initFpTri();  
   
   for(int i =0;i<NUM_VOICES;i++)
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
     voices[i].AddOsc1WaveTable(WTLEN,&fp_triWaveTable[0],0.5);
-    voices[i].SetOsc1ADSR(8000,1,1.0,8000);
+    voices[i].SetOsc1ADSR(1000,1,1.0,1000);
     voices[i].AddOsc2WaveTable(WTLEN,&fp_sinWaveTable[0],0.5);
-    voices[i].SetOsc2ADSR(8000,1,1.0,8000);
+    voices[i].SetOsc2ADSR(1000,1,1.0,1000);
   }
   
   /* Use 1st timer of 4 */
@@ -150,10 +151,18 @@ void setup()
   /* Start an alarm */
   timerAlarmEnable(timer);
   //Serial.println("stalnrt timer");
-  
+  //xTaskCreatePinnedToCore(scanMidi,"scanMidi",10000,NULL,1,&Task1,0);
 }
 
-
+void printMidiMessage(uint8_t command, uint8_t data1, uint8_t data2)
+{
+  Serial.print("MIDI DATA:");
+  Serial.print(command);
+  Serial.print(":");
+  Serial.print(data1);
+  Serial.print(":");
+  Serial.println(data2);
+}
 void testChords()
 {
   if(t_counter%32000==0)
@@ -204,16 +213,30 @@ midistate mstate=WAIT_COMMAND;
 
 void handleNoteOn(byte channel, byte note, byte velocity)
 {
+  
+  bool found=false;
+  int maxnote = -1;
+  int maxnoteidx = -1;
   digitalWrite(LED,HIGH);
+  
   for(int i=0;i<NUM_VOICES;i++)
   {
     if(voices_notes[i]==-1)
     {
       voices_notes[i]=note;
       voices[i].MidiNoteOn(note);
-      break;
+      found = true;
+      return;
+    }
+    if(voices_notes[i]>maxnote)
+    {
+      maxnote = voices_notes[i];
+      maxnoteidx = i;
     }
   }
+  voices_notes[maxnoteidx]=note;
+  voices[maxnoteidx].MidiNoteOn(note);
+  
 }
 void handleNoteOff(byte channel, byte note, byte velocity)
 {
@@ -230,29 +253,40 @@ void handleNoteOff(byte channel, byte note, byte velocity)
 }
 void loop()
 {
+  //testChords();
+  scanMidi();
+  if(t_counter%8000==0)
+  {
+    Serial.println(avg_time_micros);
+  }
+  
+}
+void scanMidi()
+{
+
   pinMode(LED,OUTPUT);
   if(firsttime)
   {
-    Serial.write(144);
-    Serial.write(59);
-    Serial.write(120);
-    Serial.flush();
+    //Serial.write(144);
+    //Serial.write(59);
+    //Serial.write(120);
+    //Serial.flush();
     firsttime = false;
   }
   switch(mstate)
   {
     case WAIT_COMMAND:
-      serialData = Serial.read();  
+      serialData = hSerial.read();  
       if(serialData>-1)
       {
         commandByte = serialData;
         command = (commandByte>>4)&7;
         channel = commandByte & 15;
         
-        Serial.write(144);
-        Serial.write(command);
-        Serial.write(channel);
-        Serial.flush();
+        //Serial.write(144);
+        //Serial.write(command);
+        //Serial.write(channel);
+        //Serial.flush();
         
         switch(command)
         {
@@ -279,7 +313,7 @@ void loop()
       }
     return;
     case WAIT_DATA1:
-      serialData = Serial.read();
+      serialData = hSerial.read();
       if(serialData>-1)
       {
         data1 = serialData;
@@ -297,17 +331,19 @@ void loop()
       }
     return;
     case WAIT_DATA2:
-      serialData = Serial.read();
+      serialData = hSerial.read();
       if(serialData>-1)
       {
         data2 = serialData;
         switch(command)
         {
           case 0:
+          printMidiMessage(command,data1,data2);
           handleNoteOff(channel,data1,data2);
           mstate = WAIT_COMMAND;
           break;
           case 1:
+          printMidiMessage(command,data1,data2);
           handleNoteOn(channel,data1,data2);
           mstate = WAIT_COMMAND;
           break;
