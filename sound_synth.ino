@@ -3,12 +3,24 @@
 #include <HardwareSerial.h>
 #include "SynthVoice.h"
 #define ANALOG_IN 36
-#define RED_BUTTON 4
+
+// specify the board to use for pinout
+#define ESP32DEVKIT1_DOIT
+#ifdef ESP32DEVKIT1_DOIT
+#define LED 2
+#define MIDIRX 16
+#define MIDITX 17
+#else
 #define LED 21
+#define MIDIRX 22
+#define MIDITX 19
+#endif
+#define RED_BUTTON 4
+
 #define YELLOW_BUTTON 2
 #define AUDIOBUFSIZE 64000
-#define SAMPLE_RATE 8000
-#define NUM_VOICES 8
+#define SAMPLE_RATE 20000
+#define NUM_VOICES 1
 #define WTLEN 256
 #define MIDI_COMMAND 128
 hw_timer_t * timer = NULL;
@@ -87,9 +99,9 @@ void IRAM_ATTR onTimer() {
   
   for(int i=0;i<NUM_VOICES;i++)
   {
-    s = s + (int32_t)(voices[i].Process() ); 
+    s = s + (int32_t)(voices[i].Process() + Num(127)); 
   }
-  data = (s+128*NUM_VOICES)/NUM_VOICES;
+  data = (s/(NUM_VOICES));
     //s = ((int32_t)nsinosc.Process())+128;
      //s = s+(fpsinosc[i].Process())>>16;
      //s = nsinosc.Process()>>10;
@@ -109,7 +121,9 @@ void setup()
   WiFi.mode(WIFI_OFF);
   btStop();
   Serial.begin(115200);
-  hSerial.begin(31250,SERIAL_8N1,22,19);
+  hSerial.setRxBufferSize(1);
+  hSerial.begin(31250,SERIAL_8N1,MIDIRX,MIDITX);
+  
   //hSerial.begin(115200);
   pinMode(LED,OUTPUT);
   digitalWrite(LED,HIGH);
@@ -162,6 +176,7 @@ void printMidiMessage(uint8_t command, uint8_t data1, uint8_t data2)
   Serial.print(data1);
   Serial.print(":");
   Serial.println(data2);
+  Serial.flush();
 }
 void testChords()
 {
@@ -255,10 +270,12 @@ void loop()
 {
   //testChords();
   scanMidi();
-  if(t_counter%8000==0)
+  /*
+  if(t_counter%32000==0)
   {
     Serial.println(avg_time_micros);
   }
+  */
   
 }
 void scanMidi()
