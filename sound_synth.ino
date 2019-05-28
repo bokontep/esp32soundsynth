@@ -20,17 +20,21 @@
 #define YELLOW_BUTTON 2
 #define AUDIOBUFSIZE 64000
 #define SAMPLE_RATE 20000
-#define NUM_VOICES 1
+#define NUM_VOICES 4
+#define NUM_DRUMS 2
 #define WTLEN 256
 #define MIDI_COMMAND 128
 hw_timer_t * timer = NULL;
 volatile long t = 0;
+HardwareSerial console(0);
 HardwareSerial hSerial(2);
 
 int8_t fp_sinWaveTable[WTLEN];
 int8_t fp_sawWaveTable[WTLEN];
 int8_t fp_triWaveTable[WTLEN];
 int8_t fp_squWaveTable[WTLEN];
+int8_t fp_plsWaveTable[WTLEN];
+int8_t fp_rndWaveTable[WTLEN];
 
 uint8_t audio_buffer[AUDIOBUFSIZE];
 double f = 22.5;
@@ -38,6 +42,7 @@ int notes[] = {0,3,5,12,15,17,24,27,29};
 int notelen = 9;
 int noteidx = 0;
 int voices_notes[NUM_VOICES];
+int drums_notes[NUM_DRUMS];
 void initFpSin()
 {
   for(int i=0;i<WTLEN;i++)
@@ -75,13 +80,38 @@ void initFpSaw()
   }
   
 }
-
+void initFpRnd()
+{
+  for(int i=0;i<WTLEN;i++)
+  {
+    fp_rndWaveTable[i] = (int8_t)(random(0,255)-127);
+  }
+}
+void initFpPls()
+{
+  for(int i=0;i<WTLEN;i++)
+  {
+    if(i ==WTLEN/4)
+    {
+      fp_plsWaveTable[i] = 127;
+    }
+    else if(i==WTLEN-(WTLEN/4))
+    {
+      fp_plsWaveTable[i] = -127;
+    }
+    else
+    {
+      fp_plsWaveTable[i] = 0;
+    }
+  }
+}
 
 double beatlen(double bpm)
 {
   return (double)60000.0/(bpm*4);
 }
 SynthVoice voices[NUM_VOICES];
+SynthVoice drums[NUM_DRUMS];
 
 volatile bool play = false;
 volatile unsigned long t_start;
@@ -96,7 +126,7 @@ void IRAM_ATTR onTimer() {
   t_start = micros();
   int64_t s = 0;
   uint8_t data=0;
-  
+  uint8_t datar = 0;
   for(int i=0;i<NUM_VOICES;i++)
   {
     s = s + (int32_t)(voices[i].Process() + Num(127)); 
@@ -105,10 +135,14 @@ void IRAM_ATTR onTimer() {
     //s = ((int32_t)nsinosc.Process())+128;
      //s = s+(fpsinosc[i].Process())>>16;
      //s = nsinosc.Process()>>10;
-  
-  
+  s = 0;
+  for(int i=0;i<NUM_DRUMS;i++)
+  {
+    s = s + (int32_t)(drums[i].Process() + Num(127));
+  }
+  datar = (s/NUM_DRUMS);
   dacWrite(25, data);
-  dacWrite(26, data);
+  dacWrite(26, datar);
   t_end = micros();
   t_diff = t_end-t_start;
   t_counter++;
@@ -120,8 +154,8 @@ void setup()
   
   WiFi.mode(WIFI_OFF);
   btStop();
-  Serial.begin(115200);
-  hSerial.setRxBufferSize(1);
+  console.begin(57600,SERIAL_8N1);
+  //hSerial.setRxBufferSize(1);
   hSerial.begin(31250,SERIAL_8N1,MIDIRX,MIDITX);
   
   //hSerial.begin(115200);
@@ -134,19 +168,32 @@ void setup()
   {
     voices_notes[i] = -1;
   }
-  
+  for(int i=0;i<NUM_DRUMS;i++)
+  {
+    drums_notes[i] = -1;
+  }
   initFpSaw();
   initFpSin();
   initFpSqu();
   initFpTri();  
+  initFpRnd();
+  initFpPls();
   
   for(int i =0;i<NUM_VOICES;i++)
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
     voices[i].AddOsc1WaveTable(WTLEN,&fp_triWaveTable[0],0.5);
     voices[i].SetOsc1ADSR(1000,1,1.0,1000);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_sinWaveTable[0],0.5);
+    voices[i].AddOsc2WaveTable(WTLEN,&fp_sawWaveTable[0],0.5);
     voices[i].SetOsc2ADSR(1000,1,1.0,1000);
+  }
+  for(int i=0;i<NUM_DRUMS;i++)
+  {
+    drums[i] = SynthVoice(SAMPLE_RATE);
+    drums[i].AddOsc1WaveTable(WTLEN,&fp_rndWaveTable[0],0.5);
+    drums[i].SetOsc1ADSR(30,30,0.0,1);
+    drums[i].AddOsc2WaveTable(WTLEN,&fp_rndWaveTable[0],0.5);
+    drums[i].SetOsc2ADSR(30,30,0.0,1);
   }
   
   /* Use 1st timer of 4 */
@@ -170,13 +217,13 @@ void setup()
 
 void printMidiMessage(uint8_t command, uint8_t data1, uint8_t data2)
 {
-  Serial.print("MIDI DATA:");
-  Serial.print(command);
-  Serial.print(":");
-  Serial.print(data1);
-  Serial.print(":");
-  Serial.println(data2);
-  Serial.flush();
+  console.print("MIDI DATA:");
+  console.print(command);
+  console.print(":");
+  console.print(data1);
+  console.print(":");
+  console.println(data2);
+  console.flush();
 }
 void testChords()
 {
@@ -184,18 +231,18 @@ void testChords()
   {
     for(int i = 0;i<NUM_VOICES;i++)
     {
-      Serial.print("Voice ");
-      Serial.print(i);
+      console.print("Voice ");
+      console.print(i);
       if(voices[i].IsPlaying())
       {
         voices[i].MidiNoteOff();
-        Serial.println("noteoff");  
+        console.println("noteoff");  
         
       }
       else
       {
         int root = random(40,60);
-        Serial.println("noteon");
+        console.println("noteon");
         if(noteidx>=notelen)
         {
           noteidx=0;
@@ -209,7 +256,7 @@ void testChords()
   
   if(t_counter%8000==0)
   {
-    Serial.println(avg_time_micros);
+    console.println(avg_time_micros);
   }
   
 }
@@ -233,36 +280,74 @@ void handleNoteOn(byte channel, byte note, byte velocity)
   int maxnote = -1;
   int maxnoteidx = -1;
   digitalWrite(LED,HIGH);
-  
-  for(int i=0;i<NUM_VOICES;i++)
+  if(channel !=10)
   {
-    if(voices_notes[i]==-1)
+    for(int i=0;i<NUM_VOICES;i++)
     {
-      voices_notes[i]=note;
-      voices[i].MidiNoteOn(note);
-      found = true;
-      return;
+      if(voices_notes[i]==-1)
+      {
+        voices_notes[i]=note;
+        voices[i].MidiNoteOn(note);
+        found = true;
+        return;
+      }
+      if(voices_notes[i]>maxnote)
+      {
+        maxnote = voices_notes[i];
+        maxnoteidx = i;
+      }
     }
-    if(voices_notes[i]>maxnote)
-    {
-      maxnote = voices_notes[i];
-      maxnoteidx = i;
-    }
+    voices_notes[maxnoteidx]=note;
+    voices[maxnoteidx].MidiNoteOn(note);
   }
-  voices_notes[maxnoteidx]=note;
-  voices[maxnoteidx].MidiNoteOn(note);
+  else
+  {
+    for(int i=0;i<NUM_DRUMS;i++)
+    {
+      if(drums_notes[i]==-1)
+      {
+        drums_notes[i]=note;
+        drums[i].MidiNoteOn(note);
+        found = true;
+        return;
+      }
+      if(drums_notes[i]>maxnote)
+      {
+        maxnote = voices_notes[i];
+        maxnoteidx = i;
+      }
+    }
+    drums_notes[maxnoteidx]=note;
+    drums[maxnoteidx].MidiNoteOn(note);
+  }
   
 }
 void handleNoteOff(byte channel, byte note, byte velocity)
 {
-  digitalWrite(LED,LOW);
-  for(int i=0;i<NUM_VOICES;i++)
+  if(channel!=10)
   {
-    if(voices_notes[i]==note)
+    digitalWrite(LED,LOW);
+    for(int i=0;i<NUM_VOICES;i++)
     {
-      voices_notes[i]=-1;
-      voices[i].MidiNoteOff();
-      //break;
+      if(voices_notes[i]==note)
+      {
+        voices_notes[i]=-1;
+        voices[i].MidiNoteOff();
+        //break;
+      }
+    }
+  }
+  else
+  {
+    digitalWrite(LED,LOW);
+    for(int i=0;i<NUM_DRUMS;i++)
+    {
+      if(drums_notes[i]==note)
+      {
+        drums_notes[i]=-1;
+        drums[i].MidiNoteOff();
+        //break;
+      }
     }
   }
 }
