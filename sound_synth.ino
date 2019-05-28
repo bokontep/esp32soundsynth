@@ -191,9 +191,9 @@ void setup()
   {
     drums[i] = SynthVoice(SAMPLE_RATE);
     drums[i].AddOsc1WaveTable(WTLEN,&fp_rndWaveTable[0],0.5);
-    drums[i].SetOsc1ADSR(30,30,0.0,1);
+    drums[i].SetOsc1ADSR(50,40,0.0,1);
     drums[i].AddOsc2WaveTable(WTLEN,&fp_rndWaveTable[0],0.5);
-    drums[i].SetOsc2ADSR(30,30,0.0,1);
+    drums[i].SetOsc2ADSR(45,40,0.0,1);
   }
   
   /* Use 1st timer of 4 */
@@ -351,6 +351,21 @@ void handleNoteOff(byte channel, byte note, byte velocity)
     }
   }
 }
+void handlePitchBend(byte channel, byte bendlsb, byte bendmsb)
+{
+  if(channel!=10)
+  {
+    uint16_t bend = bendmsb<<7 | bendlsb;
+    for(int i=0;i<NUM_VOICES;i++)
+    {
+      if(voices[i].IsPlaying())
+      {
+        
+        voices[i].MidiBend(bend);
+      }
+    }
+  }
+}
 void loop()
 {
   //testChords();
@@ -407,6 +422,7 @@ void scanMidi()
           case 5: // CHANNEL PRESSURE
           break;
           case 6: // PITCH BEND
+            mstate = WAIT_DATA1;
           break;
           case 7: // NON MUSICAL COMMANDS
           break;        
@@ -428,6 +444,9 @@ void scanMidi()
           case 1:
           mstate = WAIT_DATA2;
           break;
+          case 6:
+          mstate = WAIT_DATA2;
+          break;
         }
         
       }
@@ -447,6 +466,10 @@ void scanMidi()
           case 1:
           printMidiMessage(command,data1,data2);
           handleNoteOn(channel,data1,data2);
+          mstate = WAIT_COMMAND;
+          break;
+          case 6:
+          handlePitchBend(channel,data1,data2);
           mstate = WAIT_COMMAND;
           break;
         }

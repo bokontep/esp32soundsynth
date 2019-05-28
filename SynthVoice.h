@@ -21,8 +21,10 @@ public:
     void MidiNoteOn(uint8_t note)
     {
         double f = pow(2.0,(note*1.0-69.0)/12.0)*440.0; 
-        osc[0].SetFrequency(f,sampleRate);
-        osc[1].SetFrequency(f,sampleRate);
+        freq1 = f;
+        freq2 = f;
+        osc[0].SetFrequency(freq1,sampleRate);
+        osc[1].SetFrequency(freq2,sampleRate);
         adsr[0].Gate(1);
         adsr[1].Gate(1);
     }
@@ -47,6 +49,16 @@ public:
     {
         adsr[1].SetADSR(a,d,s,r);
     }
+    void MidiBend(uint16_t bend)
+    {
+      double factor = ((bend - 8192.0)/8192.0);
+      double mul = pow(2.0,(factor*12.0)/12.0);
+      double bendfreq1 = freq1*mul;
+      double bendfreq2 = freq2*mul;
+      osc[0].SetFrequency(bendfreq1,sampleRate);
+      osc[1].SetFrequency(bendfreq2,sampleRate);
+      
+    }
     Num Process()
     {
         return (adsr[0].Process()*osc[0].Process()+adsr[1].Process()*osc[1].Process())>>1;
@@ -63,6 +75,8 @@ protected:
     NumWaveTableOsc osc[2];
     ADSR adsr[2];
     double sampleRate;
+    double freq1;
+    double freq2;
     
 };
 
