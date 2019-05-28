@@ -183,8 +183,10 @@ void setup()
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
     voices[i].AddOsc1WaveTable(WTLEN,&fp_triWaveTable[0],0.5);
+    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0],0.5);
     voices[i].SetOsc1ADSR(1000,1,1.0,1000);
     voices[i].AddOsc2WaveTable(WTLEN,&fp_sawWaveTable[0],0.5);
+    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0],0.5);
     voices[i].SetOsc2ADSR(1000,1,1.0,1000);
   }
   for(int i=0;i<NUM_DRUMS;i++)
@@ -247,7 +249,7 @@ void testChords()
         {
           noteidx=0;
         }
-        voices[i].MidiNoteOn(notes[noteidx]+root);
+        voices[i].MidiNoteOn(notes[noteidx]+root,127);
         noteidx++;
       }
       
@@ -287,7 +289,7 @@ void handleNoteOn(byte channel, byte note, byte velocity)
       if(voices_notes[i]==-1)
       {
         voices_notes[i]=note;
-        voices[i].MidiNoteOn(note);
+        voices[i].MidiNoteOn(note,velocity);
         found = true;
         return;
       }
@@ -298,7 +300,7 @@ void handleNoteOn(byte channel, byte note, byte velocity)
       }
     }
     voices_notes[maxnoteidx]=note;
-    voices[maxnoteidx].MidiNoteOn(note);
+    voices[maxnoteidx].MidiNoteOn(note,velocity);
   }
   else
   {
@@ -307,7 +309,7 @@ void handleNoteOn(byte channel, byte note, byte velocity)
       if(drums_notes[i]==-1)
       {
         drums_notes[i]=note;
-        drums[i].MidiNoteOn(note);
+        drums[i].MidiNoteOn(note,velocity);
         found = true;
         return;
       }
@@ -318,7 +320,7 @@ void handleNoteOn(byte channel, byte note, byte velocity)
       }
     }
     drums_notes[maxnoteidx]=note;
-    drums[maxnoteidx].MidiNoteOn(note);
+    drums[maxnoteidx].MidiNoteOn(note,velocity);
   }
   
 }

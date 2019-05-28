@@ -18,9 +18,11 @@ public:
     ~SynthVoice(void) {
         
     }
-    void MidiNoteOn(uint8_t note)
+    void MidiNoteOn(uint8_t note, uint8_t vel)
     {
-        double f = pow(2.0,(note*1.0-69.0)/12.0)*440.0; 
+        
+        double f = pow(2.0,(note*1.0-69.0)/12.0)*440.0;
+        velocity = Num(vel/128.0); 
         freq1 = f;
         freq2 = f;
         osc[0].SetFrequency(freq1,sampleRate);
@@ -61,7 +63,7 @@ public:
     }
     Num Process()
     {
-        return (adsr[0].Process()*osc[0].Process()+adsr[1].Process()*osc[1].Process())>>1;
+        return (velocity*adsr[0].Process()*osc[0].Process()+velocity*adsr[1].Process()*osc[1].Process())>>1;
     }
     bool IsPlaying()
     {
@@ -77,7 +79,7 @@ protected:
     double sampleRate;
     double freq1;
     double freq2;
-    
+    Num velocity;
 };
 
 #endif
