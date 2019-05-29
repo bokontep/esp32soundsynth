@@ -487,6 +487,7 @@ void scanMidi()
           case 3:
           handleCC(channel, data1, data2);
           mstate = WAIT_COMMAND;
+          break;
           case 6:
           handlePitchBend(channel,data1,data2);
           mstate = WAIT_COMMAND;
