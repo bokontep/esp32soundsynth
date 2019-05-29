@@ -368,6 +368,10 @@ void handlePitchBend(byte channel, byte bendlsb, byte bendmsb)
     }
   }
 }
+void handleCC(byte channel, byte bendlsb, byte bendmsb)
+{
+  
+}
 void loop()
 {
   //testChords();
@@ -418,6 +422,7 @@ void scanMidi()
           case 2: //AFTERTOUCH
           break;
           case 3: //CONTINUOUS CONTROLLER (CC)
+            mstate = WAIT_DATA1;
           break;
           case 4: // PATCH CHANGE
           break;
@@ -446,6 +451,9 @@ void scanMidi()
           case 1:
           mstate = WAIT_DATA2;
           break;
+          case 3:
+          mstate = WAIT_DATA2;
+          break;
           case 6:
           mstate = WAIT_DATA2;
           break;
@@ -470,6 +478,9 @@ void scanMidi()
           handleNoteOn(channel,data1,data2);
           mstate = WAIT_COMMAND;
           break;
+          case 3:
+          handleCC(channel, data1, data2);
+          mstate = WAIT_COMMAND;
           case 6:
           handlePitchBend(channel,data1,data2);
           mstate = WAIT_COMMAND;
