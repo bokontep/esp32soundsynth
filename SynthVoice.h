@@ -11,9 +11,11 @@ public:
     SynthVoice()
     {
         this->sampleRate = 8000;
+        this->modulation = 0;
     }
     SynthVoice(double sampleRate) {
         this->sampleRate = sampleRate;
+        this->modulation = 0;
     }
     ~SynthVoice(void) {
         
@@ -61,9 +63,23 @@ public:
       osc[1].SetFrequency(bendfreq2,sampleRate);
       
     }
+    void MidiMod(uint8_t newmod)
+    {
+      modulation = Num(newmod)/Num(127.0);
+      fmod1 = Num(1.0)-Num(modulation)/Num(127.0);
+      fmod2 = Num(1.0)-Num(modulation)/Num(127.0);
+      fmod3 = modulation; 
+    }
     Num Process()
     {
+      if(modulation==Num(0))
+      {
         return (velocity*adsr[0].Process()*osc[0].Process()+velocity*adsr[1].Process()*osc[1].Process())>>1;
+      }
+      else
+      {
+        return  ((velocity*adsr[0].Process()*osc[0].Process()*fmod1) + (velocity*adsr[1].Process()*osc[1].Process()*fmod2) + (velocity*(adsr[0].Process()*osc[0].Process()*osc[1].Process()*fmod3)))/Num(3.0);
+      }
     }
     bool IsPlaying()
     {
@@ -80,6 +96,10 @@ protected:
     double freq1;
     double freq2;
     Num velocity;
+    Num modulation;
+    Num fmod1;
+    Num fmod2;
+    Num fmod3;
 };
 
 #endif

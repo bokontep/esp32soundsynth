@@ -19,8 +19,8 @@
 
 #define YELLOW_BUTTON 2
 #define AUDIOBUFSIZE 64000
-#define SAMPLE_RATE 20000
-#define NUM_VOICES 4
+#define SAMPLE_RATE 10000
+#define NUM_VOICES 6
 #define NUM_DRUMS 2
 #define WTLEN 256
 #define MIDI_COMMAND 128
@@ -360,16 +360,22 @@ void handlePitchBend(byte channel, byte bendlsb, byte bendmsb)
     uint16_t bend = bendmsb<<7 | bendlsb;
     for(int i=0;i<NUM_VOICES;i++)
     {
-      if(voices[i].IsPlaying())
-      {
-        
-        voices[i].MidiBend(bend);
-      }
+      voices[i].MidiBend(bend);
     }
   }
 }
-void handleCC(byte channel, byte bendlsb, byte bendmsb)
+void handleCC(byte channel, byte cc, byte data)
 {
+  switch(cc)
+  {
+    case 1: //Modulation
+      for(int i=0;i<NUM_VOICES;i++)
+      {
+        voices[i].MidiMod(data);
+      }
+    break;
+  }
+    
   
 }
 void loop()
