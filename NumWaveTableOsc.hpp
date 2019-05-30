@@ -66,7 +66,7 @@ public:
     //
     // SetPhaseOffset: Phase offset for PWM, 0-1
     //
-    void SetPhaseOffset(double offset) {
+    void SetPhaseOffset(Num offset) {
         mPhaseOfs = offset;
     }
 
@@ -85,7 +85,14 @@ public:
     //
     Num Process(void) {
         UpdatePhase();
-        return GetOutput();
+        if(mPhaseOfs!=Num(0))
+        {
+          return GetOutputMinusOffset(); 
+        }
+        else
+        {
+          return GetOutput();
+        }
     }
 
     //
@@ -116,7 +123,8 @@ public:
         Num len = waveTable->waveTableLen;
         int8_t *wave = waveTable->waveTable;
 
-        // linear
+
+
         Num temp = mPhasor * len;
         Num intPart = Fixie::Util::floor(temp);
         Num fracPart = temp - intPart;
@@ -162,10 +170,15 @@ public:
         return mNumWaveTables;
     }
 
+    void ResetPhase()
+    {
+      mPhasor = Num(0.0);
+    }
+
 protected:
     Num mPhasor = Num(0.0);       // phase accumulator
     Num mPhaseInc = Num(0.0);     // phase increment
-    Num mPhaseOfs = Num(0.5);     // phase offset for PWM
+    Num mPhaseOfs = Num(0);     // phase offset for PWM
 
     // array of wavetables
     int mCurWaveTable = 0;      // current table, based on current frequency

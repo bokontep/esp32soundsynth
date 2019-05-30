@@ -20,7 +20,7 @@
 #define YELLOW_BUTTON 2
 #define AUDIOBUFSIZE 64000
 #define SAMPLE_RATE 10000
-#define NUM_VOICES 6
+#define NUM_VOICES 8
 #define NUM_DRUMS 2
 #define WTLEN 256
 #define MIDI_COMMAND 128
@@ -372,6 +372,12 @@ void handleCC(byte channel, byte cc, byte data)
       for(int i=0;i<NUM_VOICES;i++)
       {
         voices[i].MidiMod(data);
+      }
+    break;
+    case 2: //PWM
+      for(int i=0;i<NUM_VOICES;i++)
+      {
+        voices[i].MidiPwm(data);
       }
     break;
   }

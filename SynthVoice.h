@@ -12,10 +12,12 @@ public:
     {
         this->sampleRate = 8000;
         this->modulation = 0;
+        this->pwm = Num(0.5);
     }
     SynthVoice(double sampleRate) {
         this->sampleRate = sampleRate;
         this->modulation = 0;
+        this->pwm = Num(0.5);
     }
     ~SynthVoice(void) {
         
@@ -70,6 +72,20 @@ public:
       fmod2 = Num(1.0)-Num(modulation)/Num(127.0);
       fmod3 = modulation; 
     }
+    void MidiPwm(uint8_t newmod)
+    {
+      pwm = Num(newmod)/Num(128);
+      if(newmod == 0)
+      {
+        osc[0].SetPhaseOffset(0);
+        osc[1].SetPhaseOffset(0);
+      }
+      else
+      {
+        osc[0].SetPhaseOffset(pwm);
+        osc[1].SetPhaseOffset(pwm);
+      }
+    }
     Num Process()
     {
       if(modulation==Num(0))
@@ -97,6 +113,7 @@ protected:
     double freq2;
     Num velocity;
     Num modulation;
+    Num pwm;
     Num fmod1;
     Num fmod2;
     Num fmod3;
