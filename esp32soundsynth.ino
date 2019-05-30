@@ -19,7 +19,7 @@
 
 #define YELLOW_BUTTON 2
 #define AUDIOBUFSIZE 64000
-#define SAMPLE_RATE 10000
+#define SAMPLE_RATE 4000
 #define NUM_VOICES 8
 #define NUM_DRUMS 2
 #define WTLEN 256
