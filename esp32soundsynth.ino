@@ -1,16 +1,36 @@
 //#include <MIDI.h>
 #include "WiFi.h"
+#include <Arduino.h>
+#include <U8g2lib.h>
+
+#ifdef U8X8_HAVE_HW_SPI
+#include <SPI.h>
+#endif
+#ifdef U8X8_HAVE_HW_I2C
+#include <Wire.h>
+#endif
+
 #include <HardwareSerial.h>
 #include "SynthVoice.h"
 #define ANALOG_IN 36
 
 // specify the board to use for pinout
-#define ESP32DEVKIT1_DOIT
+#define TTGO16MPROESP32OLED
+
+
+//#define ESP32DEVKIT1_DOIT
 #ifdef ESP32DEVKIT1_DOIT
 #define LED 2
 #define MIDIRX 16
 #define MIDITX 17
-#else
+#endif
+#ifdef TTGO16MPROESP32OLED
+//#define NOMIDI
+#define LED 2
+#define MIDIRX 36
+#define MIDITX 37
+#endif
+#ifdef GENERIC
 #define LED 21
 #define MIDIRX 22
 #define MIDITX 19
@@ -19,23 +39,27 @@
 
 #define YELLOW_BUTTON 2
 #define AUDIOBUFSIZE 64000
-#define SAMPLE_RATE 4000
-#define NUM_VOICES 8
-#define NUM_DRUMS 2
+#define SAMPLE_RATE 16000
+#define NUM_VOICES 3
+#define NUM_DRUMS 0
 #define WTLEN 256
 #define MIDI_COMMAND 128
 hw_timer_t * timer = NULL;
 volatile long t = 0;
 HardwareSerial console(0);
 HardwareSerial hSerial(2);
-
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 16,15,4);
 int8_t fp_sinWaveTable[WTLEN];
 int8_t fp_sawWaveTable[WTLEN];
 int8_t fp_triWaveTable[WTLEN];
 int8_t fp_squWaveTable[WTLEN];
 int8_t fp_plsWaveTable[WTLEN];
 int8_t fp_rndWaveTable[WTLEN];
-
+uint8_t dwfbuf_l[128];
+uint8_t dwfbuf_r[128];
+char line1[17];
+char line2[17];
+uint8_t dwfidx=0;
 uint8_t audio_buffer[AUDIOBUFSIZE];
 double f = 22.5;
 int notes[] = {0,3,5,12,15,17,24,27,29};
@@ -132,6 +156,8 @@ void IRAM_ATTR onTimer() {
     s = s + (int32_t)(voices[i].Process() + Num(127)); 
   }
   data = (s/(NUM_VOICES));
+  dwfbuf_l[dwfidx]=data;
+  
     //s = ((int32_t)nsinosc.Process())+128;
      //s = s+(fpsinosc[i].Process())>>16;
      //s = nsinosc.Process()>>10;
@@ -141,6 +167,8 @@ void IRAM_ATTR onTimer() {
     s = s + (int32_t)(drums[i].Process() + Num(127));
   }
   datar = (s/NUM_DRUMS);
+  dwfbuf_r[dwfidx]=datar;
+  dwfidx = (dwfidx+1)%128;
   dacWrite(25, data);
   dacWrite(26, datar);
   t_end = micros();
@@ -148,7 +176,7 @@ void IRAM_ATTR onTimer() {
   t_counter++;
   avg_time_micros = t_diff;
 }
-//TaskHandle_t Task1;
+TaskHandle_t Task1;
 void setup()
 {
   
@@ -156,8 +184,9 @@ void setup()
   btStop();
   console.begin(57600,SERIAL_8N1);
   //hSerial.setRxBufferSize(1);
+#ifndef NOMIDI
   hSerial.begin(31250,SERIAL_8N1,MIDIRX,MIDITX);
-  
+#endif
   //hSerial.begin(115200);
   pinMode(LED,OUTPUT);
   digitalWrite(LED,HIGH);
@@ -178,16 +207,20 @@ void setup()
   initFpTri();  
   initFpRnd();
   initFpPls();
+  strcpy(line1,"BOKONTEP    (C)");
+  strcpy(line2,"ESP32SYNTH 2019");
+  
+  
   
   for(int i =0;i<NUM_VOICES;i++)
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_triWaveTable[0],0.5);
+    voices[i].AddOsc1WaveTable(WTLEN,&fp_sinWaveTable[0],0.5);
     //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0],0.5);
-    voices[i].SetOsc1ADSR(1000,1,1.0,1000);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_sawWaveTable[0],0.5);
+    voices[i].SetOsc1ADSR(10,1,1.0,1000);
+    voices[i].AddOsc2WaveTable(WTLEN,&fp_sinWaveTable[0],0.5);
     //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0],0.5);
-    voices[i].SetOsc2ADSR(1000,1,1.0,1000);
+    voices[i].SetOsc2ADSR(10,1,1.0,1000);
   }
   for(int i=0;i<NUM_DRUMS;i++)
   {
@@ -213,9 +246,13 @@ void setup()
 
   /* Start an alarm */
   timerAlarmEnable(timer);
+  
   //Serial.println("stalnrt timer");
-  //xTaskCreatePinnedToCore(scanMidi,"scanMidi",10000,NULL,1,&Task1,0);
+  xTaskCreatePinnedToCore(displayData,"displayData",20000,NULL,1,&Task1,0);
 }
+
+
+
 
 void printMidiMessage(uint8_t command, uint8_t data1, uint8_t data2)
 {
@@ -277,7 +314,7 @@ midistate mstate=WAIT_COMMAND;
 
 void handleNoteOn(byte channel, byte note, byte velocity)
 {
-  
+  char buf[17];
   bool found=false;
   int maxnote = -1;
   int maxnoteidx = -1;
@@ -289,6 +326,10 @@ void handleNoteOn(byte channel, byte note, byte velocity)
       if(voices_notes[i]==-1)
       {
         voices_notes[i]=note;
+        sprintf(buf, "note:%d vel:%d",note, velocity);
+        strcpy(line1,buf);
+        strcpy(line2,"");
+        
         voices[i].MidiNoteOn(note,velocity);
         found = true;
         return;
@@ -384,10 +425,38 @@ void handleCC(byte channel, byte cc, byte data)
     
   
 }
+void displayData(void * parameter)
+{
+  u8g2.begin();
+  while(true)
+  {
+  u8g2.clearBuffer();          // clear the internal memory
+  //u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
+  for (int i=0;i<127;i++)
+  {
+    u8g2.drawLine(i,(dwfbuf_l[i]>>2),i+1,(dwfbuf_l[i+1]>>2));
+    u8g2.drawLine(i,(dwfbuf_r[i]>>2),i+1,(dwfbuf_r[i+1]>>2));
+    
+  }
+  
+  //u8g2.setFont( u8g2_font_unifont_t_cyrillic);
+  //u8g2.drawExtUTF8(-8,10,0,NULL,line1);
+  u8g2.setFont( u8g2_font_unifont_t_greek);
+  u8g2.drawExtUTF8(-8,10,0,NULL,line1);
+  u8g2.drawExtUTF8(-8,21,0,NULL,line2);
+  
+  u8g2.sendBuffer();          // transfer internal memory to the display
+  delay(10);
+  }
+  
+}
 void loop()
 {
   //testChords();
+  #ifndef NOMIDI
   scanMidi();
+  #endif
+  //displayData();
   /*
   if(t_counter%32000==0)
   {

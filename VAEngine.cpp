@@ -16,10 +16,10 @@ class VAEngine
       s = 0;
       for (int i = 0; i < NUM_VOICES; i++)
       {
-        s = s + (int32_t)(voices[i].Process() + Num(127));
+        s = s + (int32_t)(mSynthVoice[i].Process() + Num(127));
       }
     }
-    void handleNoteOn(byte channel, byte note, byte velocity)
+    void handleNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
     {
       bool found = false;
       int maxnote = -1;
@@ -29,7 +29,7 @@ class VAEngine
         if (voices_notes[i] == -1)
         {
           voices_notes[i] = note;
-          voices[i].MidiNoteOn(note, velocity);
+          mSynthVoice[i].MidiNoteOn(note, velocity);
           found = true;
           return;
         }
@@ -40,18 +40,18 @@ class VAEngine
         }
       }
       voices_notes[maxnoteidx] = note;
-      voices[maxnoteidx].MidiNoteOn(note, velocity);
+      mSynthVoice[maxnoteidx].MidiNoteOn(note, velocity);
     }
     
-    void handleNoteOff(byte channel, byte note, byte velocity)
+    void handleNoteOff(uint8_t channel, uint8_t note, uint8_t velocity)
     {
-      digitalWrite(LED, LOW);
+      //digitalWrite(LED, LOW);
       for (int i = 0; i < NUM_VOICES; i++)
       {
         if (voices_notes[i] == note)
         {
           voices_notes[i] = -1;
-          voices[i].MidiNoteOff();
+          mSynthVoice[i].MidiNoteOff();
           //break;
         }
       }
@@ -62,4 +62,4 @@ class VAEngine
       volatile int64_t s = 0; 
       
   
-}
+};
