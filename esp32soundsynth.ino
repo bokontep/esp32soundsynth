@@ -15,9 +15,9 @@
 #define ANALOG_IN 36
 
 // specify the board to use for pinout
-#define TTGO16MPROESP32OLED
+//#define TTGO16MPROESP32OLED
 
-
+#define ESP32DEVKIT1_DOIT
 //#define ESP32DEVKIT1_DOIT
 #ifdef ESP32DEVKIT1_DOIT
 #define LED 2
@@ -39,8 +39,8 @@
 
 #define YELLOW_BUTTON 2
 #define AUDIOBUFSIZE 64000
-#define SAMPLE_RATE 16000
-#define NUM_VOICES 3
+#define SAMPLE_RATE 14000
+#define NUM_VOICES 4
 #define NUM_DRUMS 0
 #define WTLEN 256
 #define MIDI_COMMAND 128
@@ -48,7 +48,10 @@ hw_timer_t * timer = NULL;
 volatile long t = 0;
 HardwareSerial console(0);
 HardwareSerial hSerial(2);
+#ifdef TTGO16MPROESP32OLED
+
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 16,15,4);
+#endif
 int8_t fp_sinWaveTable[WTLEN];
 int8_t fp_sawWaveTable[WTLEN];
 int8_t fp_triWaveTable[WTLEN];
@@ -166,7 +169,7 @@ void IRAM_ATTR onTimer() {
   {
     s = s + (int32_t)(drums[i].Process() + Num(127));
   }
-  datar = (s/NUM_DRUMS);
+  datar = data;//(s/NUM_DRUMS);
   dwfbuf_r[dwfidx]=datar;
   dwfidx = (dwfidx+1)%128;
   dacWrite(25, data);
@@ -215,22 +218,40 @@ void setup()
   for(int i =0;i<NUM_VOICES;i++)
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_sinWaveTable[0],0.5);
-    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0],0.5);
+    voices[i].AddOsc1WaveTable(WTLEN,&fp_sinWaveTable[0]);
+    voices[i].AddOsc1WaveTable(WTLEN,&fp_sawWaveTable[0]);
+    voices[i].AddOsc1WaveTable(WTLEN,&fp_triWaveTable[0]);
+    voices[i].AddOsc1WaveTable(WTLEN,&fp_squWaveTable[0]);
+    voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
+    voices[i].AddOsc1WaveTable(WTLEN,&fp_rndWaveTable[0]);
+
+    
+    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
     voices[i].SetOsc1ADSR(10,1,1.0,1000);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_sinWaveTable[0],0.5);
-    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0],0.5);
+    voices[i].AddOsc2WaveTable(WTLEN,&fp_sinWaveTable[0]);
+    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
+    
+    voices[i].AddOsc2WaveTable(WTLEN,&fp_sawWaveTable[0]);
+    voices[i].AddOsc2WaveTable(WTLEN,&fp_triWaveTable[0]);
+    voices[i].AddOsc2WaveTable(WTLEN,&fp_squWaveTable[0]);
+    voices[i].AddOsc2WaveTable(WTLEN,&fp_plsWaveTable[0]);
+    voices[i].AddOsc2WaveTable(WTLEN,&fp_rndWaveTable[0]);
+
+    
+    
+    
     voices[i].SetOsc2ADSR(10,1,1.0,1000);
   }
+  /*
   for(int i=0;i<NUM_DRUMS;i++)
   {
     drums[i] = SynthVoice(SAMPLE_RATE);
-    drums[i].AddOsc1WaveTable(WTLEN,&fp_rndWaveTable[0],0.5);
+    drums[i].AddOsc1WaveTable(WTLEN,&fp_rndWaveTable[0]);
     drums[i].SetOsc1ADSR(50,40,0.0,1);
-    drums[i].AddOsc2WaveTable(WTLEN,&fp_rndWaveTable[0],0.5);
+    drums[i].AddOsc2WaveTable(WTLEN,&fp_rndWaveTable[0]);
     drums[i].SetOsc2ADSR(45,40,0.0,1);
   }
-  
+  */
   /* Use 1st timer of 4 */
   /* 1 tick take 1/(80MHZ/80) = 1u16s so we set divider 80 and count up */
   timer = timerBegin(0, 80, true);
@@ -246,9 +267,10 @@ void setup()
 
   /* Start an alarm */
   timerAlarmEnable(timer);
-  
-  //Serial.println("stalnrt timer");
+  #ifdef TTGO16MPROESP32OLED
+    //Serial.println("stalnrt timer");
   xTaskCreatePinnedToCore(displayData,"displayData",20000,NULL,1,&Task1,0);
+  #endif
 }
 
 
@@ -420,6 +442,20 @@ void handleCC(byte channel, byte cc, byte data)
       {
         voices[i].MidiPwm(data);
       }
+     
+      
+    break;
+    case 64: //pedal osc1 waveform
+      for(int i=0;i<NUM_VOICES;i++)
+      {
+        voices[i].MidiOsc1Wave(data);
+      }
+    break;
+    case 65: //portamento osc2 waveform
+      for(int i=0;i<NUM_VOICES;i++)
+      {
+        voices[i].MidiOsc1Wave(data);
+      }
     break;
   }
     
@@ -427,6 +463,7 @@ void handleCC(byte channel, byte cc, byte data)
 }
 void displayData(void * parameter)
 {
+  #ifdef TTGO16MPROESP32OLED
   u8g2.begin();
   while(true)
   {
@@ -447,8 +484,9 @@ void displayData(void * parameter)
   
   u8g2.sendBuffer();          // transfer internal memory to the display
   delay(10);
-  }
   
+  }
+  #endif
 }
 void loop()
 {

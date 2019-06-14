@@ -39,13 +39,13 @@ public:
         adsr[0].Gate(0);
         adsr[1].Gate(0);
     }
-    void AddOsc1WaveTable(int len, int8_t *waveTableIn, double topFreq)
+    void AddOsc1WaveTable(int len, int8_t *waveTableIn)
     {
-        osc[0].AddWaveTable(len,waveTableIn,topFreq);
+        osc[0].AddWaveTable(len,waveTableIn);
     }
-    void AddOsc2WaveTable(int len, int8_t *waveTableIn, double topFreq)
+    void AddOsc2WaveTable(int len, int8_t *waveTableIn)
     {
-        osc[1].AddWaveTable(len,waveTableIn,topFreq);
+        osc[1].AddWaveTable(len,waveTableIn);
     }
     void SetOsc1ADSR(Num a, Num d, Num s, Num r)
     {
@@ -86,6 +86,15 @@ public:
         osc[1].SetPhaseOffset(pwm);
       }
     }
+    void MidiOsc1Wave(uint8_t newwave)
+    {
+      osc[0].SetWaveTable(newwave);
+    }
+    void MidiOsc2Wave(uint8_t newwave)
+    {
+      osc[1].SetWaveTable(newwave);
+    }
+    
     Num Process()
     {
       if(modulation==Num(0))

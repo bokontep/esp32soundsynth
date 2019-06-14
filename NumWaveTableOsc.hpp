@@ -29,7 +29,7 @@ class NumWaveTableOsc {
 public:
     NumWaveTableOsc(void) {
         for (int idx = 0; idx < numWaveTableSlots; idx++) {
-            mWaveTables[idx].topFreq = 0;
+            
             mWaveTables[idx].waveTableLen = 0;
             mWaveTables[idx].waveTable = 0;
         }
@@ -56,11 +56,7 @@ public:
         mPhaseInc = inc;
 
         // update the current wave table selector
-        int curWaveTable = 0;
-        while ((mPhaseInc >= mWaveTables[curWaveTable].topFreq) && (curWaveTable < (mNumWaveTables - 1))) {
-            ++curWaveTable;
-        }
-        mCurWaveTable = curWaveTable;
+
     }
 
     //
@@ -147,17 +143,19 @@ public:
     //
     // AddWaveTable
     //
-    // add wavetables in order of lowest frequency to highest
-    // topFreq is the highest frequency supported by a wavetable
+    // add wavetables
     // wavetables within an oscillator can be different lengths
     //
     // returns 0 upon success, or the number of wavetables if no more room is available
     //
-    int AddWaveTable(int len, int8_t *waveTableIn, double topFreq) {
+    
+
+
+    int AddWaveTable(int len, int8_t *waveTableIn) {
         if (mNumWaveTables < numWaveTableSlots) {
             int8_t *waveTable = mWaveTables[mNumWaveTables].waveTable = new int8_t[len + 1];
             mWaveTables[mNumWaveTables].waveTableLen = len;
-            mWaveTables[mNumWaveTables].topFreq = Num(topFreq);
+            
             ++mNumWaveTables;
 
             // fill in wave
@@ -174,6 +172,10 @@ public:
     {
       mPhasor = Num(0.0);
     }
+    void SetWaveTable(int waveTableIdx)
+    {
+      this->mCurWaveTable = waveTableIdx%mNumWaveTables;
+    }
 
 protected:
     Num mPhasor = Num(0.0);       // phase accumulator
@@ -184,7 +186,7 @@ protected:
     int mCurWaveTable = 0;      // current table, based on current frequency
     int mNumWaveTables = 0;     // number of wavetable slots in use
     struct waveTable {
-        Num topFreq;
+      
         Num waveTableLen;
         int8_t *waveTable;
     };
