@@ -13,11 +13,17 @@ public:
         this->sampleRate = 8000;
         this->modulation = 0;
         this->pwm = Num(0.5);
+        this->fmod1 = Num(1.0);
+        this->fmod2 = Num(1.0);
+        this->fmod3 = Num(0.0);
     }
     SynthVoice(double sampleRate) {
         this->sampleRate = sampleRate;
         this->modulation = 0;
         this->pwm = Num(0.5);
+        this->fmod1 = Num(1.0);
+        this->fmod2 = Num(1.0);
+        this->fmod3 = Num(0.0);
     }
     ~SynthVoice(void) {
         
@@ -55,6 +61,18 @@ public:
     {
         adsr[1].SetADSR(a,d,s,r);
     }
+    void SetFmod1(double fmod)
+    {
+      this->fmod1 = Num(fmod);
+    }
+    void SetFmod2(double fmod)
+    {
+      this->fmod2 = Num(fmod);
+    }
+    void SetFmod3(double fmod)
+    {
+      this->fmod3 = Num(fmod);
+    }
     void MidiBend(uint16_t bend)
     {
       double factor = ((bend - 8192.0)/8192.0);
@@ -86,6 +104,22 @@ public:
         osc[1].SetPhaseOffset(pwm);
       }
     }
+    int GetOsc1WaveTableCount()
+    {
+      return osc[0].GetWaveTableCount();
+    }
+    int GetOsc2WaveTableCount()
+    {
+      return osc[1].GetWaveTableCount();
+    }
+    void SetOsc1PhaseOffset(uint8_t newphase)
+    {
+      osc[0].SetPhaseOffset(newphase/127.0);
+    }
+    void SetOsc2PhaseOffset(uint8_t newphase)
+    {
+      osc[1].SetPhaseOffset(newphase/127.0);
+    }
     void MidiOsc1Wave(uint8_t newwave)
     {
       osc[0].SetWaveTable(newwave);
@@ -94,12 +128,12 @@ public:
     {
       osc[1].SetWaveTable(newwave);
     }
-    
+
     Num Process()
     {
       if(modulation==Num(0))
       {
-        return (velocity*adsr[0].Process()*osc[0].Process()+velocity*adsr[1].Process()*osc[1].Process())>>1;
+        return (velocity*adsr[0].Process()*osc[0].Process()*fmod1+velocity*adsr[1].Process()*osc[1].Process()*fmod2)>>1;
       }
       else
       {

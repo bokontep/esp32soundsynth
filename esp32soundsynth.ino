@@ -70,6 +70,8 @@ int notelen = 9;
 int noteidx = 0;
 int voices_notes[NUM_VOICES];
 int drums_notes[NUM_DRUMS];
+enum controller_states{CS_OSC=0, CS_ENV,CS_AMP,CS_FIL};
+int controller_state = CS_OSC;
 void initFpSin()
 {
   for(int i=0;i<WTLEN;i++)
@@ -333,7 +335,7 @@ int data2;
 enum midistate{WAIT_COMMAND,WAIT_DATA1,WAIT_DATA2};
 bool firsttime = true;
 midistate mstate=WAIT_COMMAND;
-
+byte rotaries[4][8];
 void handleNoteOn(byte channel, byte note, byte velocity)
 {
   char buf[17];
@@ -457,9 +459,100 @@ void handleCC(byte channel, byte cc, byte data)
         voices[i].MidiOsc1Wave(data);
       }
     break;
+    case 91: //ROTARY 1 ON UMX490
+      handleRotaryData(0, controller_state,data); 
+    break;
+    case 93: //ROTARY 2 ON UMX490
+      handleRotaryData(1, controller_state,data);
+    break;
+    case 74: //ROTARY 3 ON UMX490
+      handleRotaryData(2, controller_state,data);
+    break;
+    case 71: //ROTARY 4 ON UMX490
+      handleRotaryData(3, controller_state,data);
+    break;
+    case 73: //ROTARY 5 ON UMX490
+      handleRotaryData(4, controller_state,data);
+    break;
+    case 75: //ROTARY 6 ON UMX490
+      handleRotaryData(5, controller_state,data);
+    break;
+    case 72: //ROTARY 7 ON UMX490
+      handleRotaryData(6, controller_state,data);
+    break;
+    case 10: //ROTARY 8 ON UMX490
+      handleRotaryData(7, controller_state,data);
+    break;
+    case 97: //button 1 on UMX490
+      controller_state = CS_OSC;
+    break;
+    case 96: //button 2 on UMX490
+      controller_state = CS_ENV;
+    break;
+    case 66: //button 3 on UMX490
+      controller_state = CS_AMP;
+    break;
+    case 67: //button 4 on UMX490
+      controller_state = CS_FIL;
+    break;
   }
     
   
+}
+void handleRotaryData(int rotary, int state, byte data)
+{
+  switch(state)
+  {
+    case CS_OSC:
+      switch(rotary)
+      {
+        case 0:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].MidiOsc1Wave(data%voices[i].GetOsc1WaveTableCount());
+          }
+        break;
+        case 1:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetFmod1(data-63.0/64.0);
+          }
+        break;
+        case 2:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1PhaseOffset(data/127.0);
+          }
+          break;
+        case 4:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].MidiOsc2Wave(data%voices[i].GetOsc2WaveTableCount());
+          }
+        case 5:
+        {
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+        
+            voices[i].SetFmod2(data-63.0/64.0);
+            
+          }
+        }
+        case 6:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2PhaseOffset(data/127.0);
+          }
+          break;
+      }
+    break;
+    case CS_ENV:
+    break;
+    case CS_AMP:
+    break;
+    case CS_FIL:
+    break;
+  }
 }
 void displayData(void * parameter)
 {

@@ -114,7 +114,7 @@ public:
     //
     // returns the current oscillator output
     //
-    Fixie::Num GetOutputMinusOffset() {
+    Num GetOutputMinusOffset() {
         waveTable *waveTable = &mWaveTables[mCurWaveTable];
         Num len = waveTable->waveTableLen;
         int8_t *wave = waveTable->waveTable;
@@ -176,7 +176,10 @@ public:
     {
       this->mCurWaveTable = waveTableIdx%mNumWaveTables;
     }
-
+    int GetWaveTableCount()
+    {
+      return this->mNumWaveTables;
+    }
 protected:
     Num mPhasor = Num(0.0);       // phase accumulator
     Num mPhaseInc = Num(0.0);     // phase increment
