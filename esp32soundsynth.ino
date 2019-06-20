@@ -72,6 +72,7 @@ int voices_notes[NUM_VOICES];
 int drums_notes[NUM_DRUMS];
 enum controller_states{CS_OSC=0, CS_ENV,CS_AMP,CS_FIL};
 int controller_state = CS_OSC;
+uint8_t knob_values[4][8]; //first is state, second is knob; 
 void initFpSin()
 {
   for(int i=0;i<WTLEN;i++)
@@ -501,8 +502,15 @@ void handleCC(byte channel, byte cc, byte data)
 }
 void handleRotaryData(int rotary, int state, byte data)
 {
+  int diff = knob_values[state][rotary]-data;
+  if(diff!=1 && diff!=-1)
+  {
+    return;
+  }  
+  knob_values[state][rotary] = data;
   switch(state)
   {
+    
     case CS_OSC:
       switch(rotary)
       {
@@ -544,9 +552,66 @@ void handleRotaryData(int rotary, int state, byte data)
             voices[i].SetOsc2PhaseOffset(data/127.0);
           }
           break;
+        case 7:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetFmod3(data-63.0/64.0);
+          }
+        break;
       }
     break;
     case CS_ENV:
+      switch(rotary)
+      {
+      case 0:
+        for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1ADSR(knob_values[CS_ENV][0],knob_values[CS_ENV][1],knob_values[CS_ENV][2],knob_values[CS_ENV][3]);
+          }
+      break;
+      case 1:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1ADSR(knob_values[CS_ENV][0],knob_values[CS_ENV][1],knob_values[CS_ENV][2],knob_values[CS_ENV][3]);
+          }
+      break;
+      case 2:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1ADSR(knob_values[CS_ENV][0],knob_values[CS_ENV][1],knob_values[CS_ENV][2],knob_values[CS_ENV][3]);
+          }
+      break;
+      case 3:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1ADSR(knob_values[CS_ENV][0],knob_values[CS_ENV][1],knob_values[CS_ENV][2],knob_values[CS_ENV][3]);
+          }
+      break;
+      case 4:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2ADSR(knob_values[CS_ENV][4],knob_values[CS_ENV][5],knob_values[CS_ENV][6],knob_values[CS_ENV][7]);
+          }
+      break;
+      case 5:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2ADSR(knob_values[CS_ENV][4],knob_values[CS_ENV][5],knob_values[CS_ENV][6],knob_values[CS_ENV][7]);
+          }
+      break;
+      case 6:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2ADSR(knob_values[CS_ENV][4],knob_values[CS_ENV][5],knob_values[CS_ENV][6],knob_values[CS_ENV][7]);
+          }
+      break;
+      case 7:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2ADSR(knob_values[CS_ENV][4],knob_values[CS_ENV][5],knob_values[CS_ENV][6],knob_values[CS_ENV][7]);
+          }
+      break;
+      }
     break;
     case CS_AMP:
     break;
