@@ -12,5 +12,6 @@ Hardware Testbed
 For testing I assembled 2 boards using perfboards and thin wire. I used 2 different esp32 modules. One is an older ESP32DEVKIT DOIT V1 (plain module, 4MB flash) and the other one is a TTGO 1.7 esp32 module with 4MB of flash and 4MB of psram. Currently I do not use the psram. I added a midi in and midi out circuit, and a headphone jack for audio output. (pictures and videos coming soon...)
 Video here:
 https://www.youtube.com/watch?v=Zv0jsLpSGcA&feature=youtu.be
+In the video I use a breadboarded esp32 with integrated oled IIC 128x64 pixel display. I use it to display the audio waveform and status messages/menus. I also plan to add support for text IIC 2x16 character displays.
 
 
