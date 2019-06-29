@@ -2,7 +2,7 @@
 #include "WiFi.h"
 #include <Arduino.h>
 #include <U8g2lib.h>
-
+#include "LowPass.h"
 #ifdef U8X8_HAVE_HW_SPI
 #include <SPI.h>
 #endif
@@ -13,12 +13,10 @@
 #include <HardwareSerial.h>
 #include "SynthVoice.h"
 #define ANALOG_IN 36
-
 // specify the board to use for pinout
+//#define GENERIC
 //#define TTGO16MPROESP32OLED
-
 #define ESP32DEVKIT1_DOIT
-//#define ESP32DEVKIT1_DOIT
 #ifdef ESP32DEVKIT1_DOIT
 #define LED 2
 #define MIDIRX 16
@@ -68,11 +66,16 @@ double f = 22.5;
 int notes[] = {0,3,5,12,15,17,24,27,29};
 int notelen = 9;
 int noteidx = 0;
+LowPass lowpass;
 int voices_notes[NUM_VOICES];
 int drums_notes[NUM_DRUMS];
 enum controller_states{CS_OSC=0, CS_ENV,CS_AMP,CS_FIL};
 int controller_state = CS_OSC;
 uint8_t knob_values[4][8]; //first is state, second is knob; 
+int value_pickup = 0;
+uint8_t ffreq = 127;
+uint8_t fq = 0;
+
 void initFpSin()
 {
   for(int i=0;i<WTLEN;i++)
@@ -430,7 +433,7 @@ void handlePitchBend(byte channel, byte bendlsb, byte bendmsb)
     }
   }
 }
-void handleCC(byte channel, byte cc, byte data)
+void handleCC(byte channel, byte cc, byte data, int* vpickup)
 {
   switch(cc)
   {
@@ -461,52 +464,60 @@ void handleCC(byte channel, byte cc, byte data)
       }
     break;
     case 91: //ROTARY 1 ON UMX490
-      handleRotaryData(0, controller_state,data); 
+      handleRotaryData(0, controller_state,data,vpickup); 
     break;
     case 93: //ROTARY 2 ON UMX490
-      handleRotaryData(1, controller_state,data);
+      handleRotaryData(1, controller_state,data,vpickup);
     break;
     case 74: //ROTARY 3 ON UMX490
-      handleRotaryData(2, controller_state,data);
+      handleRotaryData(2, controller_state,data,vpickup);
     break;
     case 71: //ROTARY 4 ON UMX490
-      handleRotaryData(3, controller_state,data);
+      handleRotaryData(3, controller_state,data,vpickup);
     break;
     case 73: //ROTARY 5 ON UMX490
-      handleRotaryData(4, controller_state,data);
+      handleRotaryData(4, controller_state,data,vpickup);
     break;
     case 75: //ROTARY 6 ON UMX490
-      handleRotaryData(5, controller_state,data);
+      handleRotaryData(5, controller_state,data,vpickup);
     break;
     case 72: //ROTARY 7 ON UMX490
-      handleRotaryData(6, controller_state,data);
+      handleRotaryData(6, controller_state,data,vpickup);
     break;
     case 10: //ROTARY 8 ON UMX490
-      handleRotaryData(7, controller_state,data);
+      handleRotaryData(7, controller_state,data,vpickup);
     break;
     case 97: //button 1 on UMX490
       controller_state = CS_OSC;
+      *vpickup = 1;
     break;
     case 96: //button 2 on UMX490
       controller_state = CS_ENV;
+      *vpickup = 1;
     break;
     case 66: //button 3 on UMX490
       controller_state = CS_AMP;
+      *vpickup = 1;
     break;
     case 67: //button 4 on UMX490
       controller_state = CS_FIL;
+      *vpickup = 1;
     break;
   }
     
   
 }
-void handleRotaryData(int rotary, int state, byte data)
+void handleRotaryData(int rotary, int state, byte data, int* value_pickup)
 {
   int diff = knob_values[state][rotary]-data;
-  if(diff!=1 && diff!=-1)
+  if((diff>3 || diff<-3) && *value_pickup == 1)
   {
     return;
-  }  
+  }
+  else
+  {
+    *value_pickup = 0;  
+  }
   knob_values[state][rotary] = data;
   switch(state)
   {
@@ -517,45 +528,47 @@ void handleRotaryData(int rotary, int state, byte data)
         case 0:
           for(int i=0;i<NUM_VOICES;i++)
           {
-            voices[i].MidiOsc1Wave(data%voices[i].GetOsc1WaveTableCount());
+            int divisor = 127/voices[i].GetOsc1WaveTableCount();
+            voices[i].MidiOsc1Wave(data/divisor);
           }
         break;
         case 1:
           for(int i=0;i<NUM_VOICES;i++)
           {
-            voices[i].SetFmod1(data-63.0/64.0);
+            voices[i].SetFmod1((data-63.0)/64.0);
           }
         break;
         case 2:
           for(int i=0;i<NUM_VOICES;i++)
           {
-            voices[i].SetOsc1PhaseOffset(data/127.0);
+            voices[i].SetOsc1PhaseOffset(data);
           }
           break;
         case 4:
           for(int i=0;i<NUM_VOICES;i++)
           {
-            voices[i].MidiOsc2Wave(data%voices[i].GetOsc2WaveTableCount());
+            int divisor = 127/voices[i].GetOsc2WaveTableCount();
+            voices[i].MidiOsc2Wave(data/divisor);
           }
         case 5:
         {
           for(int i=0;i<NUM_VOICES;i++)
           {
         
-            voices[i].SetFmod2(data-63.0/64.0);
+            voices[i].SetFmod2((data-63.0)/64.0);
             
           }
         }
         case 6:
           for(int i=0;i<NUM_VOICES;i++)
           {
-            voices[i].SetOsc2PhaseOffset(data/127.0);
+            voices[i].SetOsc2PhaseOffset(data);
           }
           break;
         case 7:
           for(int i=0;i<NUM_VOICES;i++)
           {
-            voices[i].SetFmod3(data-63.0/64.0);
+            voices[i].SetFmod3((data-63.0)/64.0);
           }
         break;
       }
@@ -616,6 +629,23 @@ void handleRotaryData(int rotary, int state, byte data)
     case CS_AMP:
     break;
     case CS_FIL:
+      switch(rotary)
+      {
+        case 0: // freq
+          ffreq = data;
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetFilterParameters(ffreq, fq);  
+          }
+        break;
+        case 1: // q
+          fq = data ;
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetFilterParameters(ffreq, fq);
+          }
+        break;
+      }
     break;
   }
 }
@@ -756,7 +786,7 @@ void scanMidi()
           mstate = WAIT_COMMAND;
           break;
           case 3:
-          handleCC(channel, data1, data2);
+          handleCC(channel, data1, data2,&value_pickup);
           mstate = WAIT_COMMAND;
           break;
           case 6:

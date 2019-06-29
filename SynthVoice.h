@@ -4,6 +4,7 @@
 #include "Util.h"
 #include "NumWaveTableOsc.hpp"
 #include "ADSR.h"
+#include "LowPass.h"
 using namespace Fixie;
 
 class SynthVoice {
@@ -16,6 +17,10 @@ public:
         this->fmod1 = Num(1.0);
         this->fmod2 = Num(1.0);
         this->fmod3 = Num(0.0);
+        this->ffreq = Num(1.0);
+        this->fq = Num(0.1);
+        lowpass.SetParameters(ffreq, fq);
+        
     }
     SynthVoice(double sampleRate) {
         this->sampleRate = sampleRate;
@@ -24,6 +29,9 @@ public:
         this->fmod1 = Num(1.0);
         this->fmod2 = Num(1.0);
         this->fmod3 = Num(0.0);
+        this->ffreq = Num(1.0);
+        this->fq = Num(0.1);
+        lowpass.SetParameters(ffreq, fq);
     }
     ~SynthVoice(void) {
         
@@ -128,16 +136,19 @@ public:
     {
       osc[1].SetWaveTable(newwave);
     }
-
+    void SetFilterParameters(uint8_t filter_freq, uint8_t filter_q)
+    {
+      lowpass.SetParameters(filter_freq/127.0,filter_q/127.0);
+    }
     Num Process()
     {
       if(modulation==Num(0))
       {
-        return (velocity*adsr[0].Process()*osc[0].Process()*fmod1+velocity*adsr[1].Process()*osc[1].Process()*fmod2)>>1;
+        return (lowpass.Process(velocity*adsr[0].Process()*osc[0].Process()*fmod1+velocity*adsr[1].Process()*osc[1].Process()*fmod2))>>1;
       }
       else
       {
-        return  ((velocity*adsr[0].Process()*osc[0].Process()*fmod1) + (velocity*adsr[1].Process()*osc[1].Process()*fmod2) + (velocity*(adsr[0].Process()*osc[0].Process()*osc[1].Process()*fmod3)))>>3;
+        return  lowpass.Process((velocity*adsr[0].Process()*osc[0].Process()*fmod1) + (velocity*adsr[1].Process()*osc[1].Process()*fmod2) + (velocity*(adsr[0].Process()*osc[0].Process()*osc[1].Process()*fmod3)))>>3;
       }
     }
     bool IsPlaying()
@@ -160,6 +171,9 @@ protected:
     Num fmod1;
     Num fmod2;
     Num fmod3;
+    Num ffreq;
+    Num fq;
+    LowPass lowpass;
 };
 
 #endif

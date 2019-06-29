@@ -25,7 +25,7 @@ public:
     {
         this->f = f;
         this->q = q;
-        fb = q + q/(Num(1.0) - f);
+        fb = q + q/(Num(1.01) - f);
     }
     
     Num Process(Num in)
