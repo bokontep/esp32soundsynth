@@ -57,10 +57,19 @@ public:
     {
         osc[0].AddWaveTable(len,waveTableIn);
     }
+    void AddOsc1SharedWaveTable(int len, int8_t *waveTableIn)
+    {
+        osc[0].AddSharedWaveTable(len, waveTableIn);
+    }
     void AddOsc2WaveTable(int len, int8_t *waveTableIn)
     {
         osc[1].AddWaveTable(len,waveTableIn);
     }
+    void AddOsc2SharedWaveTable(int len, int8_t *waveTableIn)
+    {
+        osc[1].AddSharedWaveTable(len, waveTableIn);
+    }
+    
     void SetOsc1ADSR(Num a, Num d, Num s, Num r)
     {
         adsr[0].SetADSR(a,d,s,r);
@@ -69,17 +78,17 @@ public:
     {
         adsr[1].SetADSR(a,d,s,r);
     }
-    void SetFmod1(double fmod)
+    void SetFmod1(uint8_t fmod)
     {
-      this->fmod1 = Num(fmod);
+      this->fmod1 = Num(fmod)/Num(64);
     }
-    void SetFmod2(double fmod)
+    void SetFmod2(uint8_t fmod)
     {
-      this->fmod2 = Num(fmod);
+      this->fmod2 = Num(fmod)/Num(64);
     }
-    void SetFmod3(double fmod)
+    void SetFmod3(uint8_t fmod)
     {
-      this->fmod3 = Num(fmod);
+      this->fmod3 = Num(fmod)/Num(64);
     }
     void MidiBend(uint16_t bend)
     {

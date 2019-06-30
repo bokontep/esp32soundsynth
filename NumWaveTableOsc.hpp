@@ -150,6 +150,19 @@ public:
     //
     
 
+    int AddSharedWaveTable(int len, int8_t *waveTableIn) {
+        if (mNumWaveTables < numWaveTableSlots) {
+            mWaveTables[mNumWaveTables].waveTable = waveTableIn;
+            mWaveTables[mNumWaveTables].waveTableLen = len-1;
+            
+            ++mNumWaveTables;
+
+            
+
+            return 0;
+        }
+        return mNumWaveTables;
+    }
 
     int AddWaveTable(int len, int8_t *waveTableIn) {
         if (mNumWaveTables < numWaveTableSlots) {
@@ -193,7 +206,7 @@ protected:
         Num waveTableLen;
         int8_t *waveTable;
     };
-    static constexpr int numWaveTableSlots = 8;    // simplify allocation with reasonable maximum
+    static constexpr int numWaveTableSlots = 256;    // simplify allocation with reasonable maximum
     waveTable mWaveTables[numWaveTableSlots];
 };
 

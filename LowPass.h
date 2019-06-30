@@ -23,9 +23,13 @@ public:
     }
     void SetParameters(Num f, Num q)
     {
+        if(f==Num(1))
+        {
+          f = Num(0.999);
+        }
         this->f = f;
         this->q = q;
-        fb = q + q/(Num(1.01) - f);
+        fb = q + q/(Num(1) - f);
     }
     
     Num Process(Num in)

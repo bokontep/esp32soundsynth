@@ -224,12 +224,12 @@ void setup()
   for(int i =0;i<NUM_VOICES;i++)
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_sinWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_sawWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_triWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_squWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_rndWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sinWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_plsWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_rndWaveTable[0]);
 
     
     //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
@@ -237,11 +237,11 @@ void setup()
     voices[i].AddOsc2WaveTable(WTLEN,&fp_sinWaveTable[0]);
     //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
     
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_sawWaveTable[0]);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_triWaveTable[0]);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_squWaveTable[0]);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_plsWaveTable[0]);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_rndWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_plsWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_rndWaveTable[0]);
 
     
     
@@ -535,7 +535,7 @@ void handleRotaryData(int rotary, int state, byte data, int* value_pickup)
         case 1:
           for(int i=0;i<NUM_VOICES;i++)
           {
-            voices[i].SetFmod1((data-63.0)/64.0);
+            voices[i].SetFmod1(data);
           }
         break;
         case 2:
@@ -555,7 +555,7 @@ void handleRotaryData(int rotary, int state, byte data, int* value_pickup)
           for(int i=0;i<NUM_VOICES;i++)
           {
         
-            voices[i].SetFmod2((data-63.0)/64.0);
+            voices[i].SetFmod2(data);
             
           }
         }
@@ -568,7 +568,7 @@ void handleRotaryData(int rotary, int state, byte data, int* value_pickup)
         case 7:
           for(int i=0;i<NUM_VOICES;i++)
           {
-            voices[i].SetFmod3((data-63.0)/64.0);
+            voices[i].SetFmod3(data);
           }
         break;
       }
