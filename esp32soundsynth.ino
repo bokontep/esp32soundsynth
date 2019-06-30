@@ -72,7 +72,7 @@ int drums_notes[NUM_DRUMS];
 enum controller_states{CS_OSC=0, CS_ENV,CS_AMP,CS_FIL};
 int controller_state = CS_OSC;
 uint8_t knob_values[4][8]; //first is state, second is knob; 
-int value_pickup = 0;
+int value_pickup[8] = {0,0,0,0,0,0,0,0};
 uint8_t ffreq = 127;
 uint8_t fq = 0;
 
@@ -489,19 +489,32 @@ void handleCC(byte channel, byte cc, byte data, int* vpickup)
     break;
     case 97: //button 1 on UMX490
       controller_state = CS_OSC;
-      *vpickup = 1;
+      for(int i=0;i<8;i++)
+      {
+        vpickup[i] = 1;  
+      }
+      
     break;
     case 96: //button 2 on UMX490
       controller_state = CS_ENV;
-      *vpickup = 1;
+      for(int i=0;i<8;i++)
+      {
+        vpickup[i] = 1;  
+      }
     break;
     case 66: //button 3 on UMX490
       controller_state = CS_AMP;
-      *vpickup = 1;
+      for(int i=0;i<8;i++)
+      {
+        vpickup[i] = 1;  
+      }
     break;
     case 67: //button 4 on UMX490
       controller_state = CS_FIL;
-      *vpickup = 1;
+      for(int i=0;i<8;i++)
+      {
+        vpickup[i] = 1;  
+      }
     break;
   }
     
@@ -510,13 +523,13 @@ void handleCC(byte channel, byte cc, byte data, int* vpickup)
 void handleRotaryData(int rotary, int state, byte data, int* value_pickup)
 {
   int diff = knob_values[state][rotary]-data;
-  if((diff>3 || diff<-3) && *value_pickup == 1)
+  if((diff>3 || diff<-3) && value_pickup[rotary] == 1)
   {
     return;
   }
   else
   {
-    *value_pickup = 0;  
+    value_pickup[rotary] = 0;  
   }
   knob_values[state][rotary] = data;
   switch(state)
@@ -786,7 +799,7 @@ void scanMidi()
           mstate = WAIT_COMMAND;
           break;
           case 3:
-          handleCC(channel, data1, data2,&value_pickup);
+          handleCC(channel, data1, data2,&value_pickup[0]);
           mstate = WAIT_COMMAND;
           break;
           case 6:
