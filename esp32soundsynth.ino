@@ -13,8 +13,8 @@
 #include <HardwareSerial.h>
 #include "SynthVoice.h"
 #define ANALOG_IN 36
-
 // specify the board to use for pinout
+//#define GENERIC
 //#define TTGO16MPROESP32OLED
 #define ESP32TTGO_T8_V1_7
 #ifdef ESP32TTGO_T8_V1_7
@@ -98,7 +98,6 @@ int noteidx = 0;
 LowPass lowpass;
 int voices_notes[NUM_VOICES];
 int drums_notes[NUM_DRUMS];
-
 enum controller_states{CS_OSC=0, CS_ENV,CS_AMP,CS_FIL};
 int controller_state = CS_OSC;
 uint8_t knob_values[4][8]; //first is state, second is knob; 
@@ -256,12 +255,12 @@ void setup()
   for(int i =0;i<NUM_VOICES;i++)
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_sinWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_sawWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_triWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_squWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
-    voices[i].AddOsc1WaveTable(WTLEN,&fp_rndWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sinWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_plsWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_rndWaveTable[0]);
 
     
     //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
@@ -269,11 +268,11 @@ void setup()
     voices[i].AddOsc2WaveTable(WTLEN,&fp_sinWaveTable[0]);
     //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
     
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_sawWaveTable[0]);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_triWaveTable[0]);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_squWaveTable[0]);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_plsWaveTable[0]);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_rndWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_plsWaveTable[0]);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_rndWaveTable[0]);
 
     
     
@@ -384,7 +383,7 @@ int data2;
 enum midistate{WAIT_COMMAND,WAIT_DATA1,WAIT_DATA2};
 bool firsttime = true;
 midistate mstate=WAIT_COMMAND;
-
+byte rotaries[4][8];
 void handleNoteOn(byte channel, byte note, byte velocity)
 {
   char buf[17];
@@ -565,7 +564,6 @@ void handleCC(byte channel, byte cc, byte data, int* vpickup)
     
   
 }
-
 void handleRotaryData(int rotary, int state, byte data, int* value_pickup)
 {
   int diff = knob_values[state][rotary]-data;
@@ -708,7 +706,6 @@ void handleRotaryData(int rotary, int state, byte data, int* value_pickup)
     break;
   }
 }
-
 void displayData(void * parameter)
 {
   #ifdef TTGO16MPROESP32OLED
