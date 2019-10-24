@@ -24,25 +24,25 @@
 #ifndef FixedPointWaveTableOsc_h
 #define FixedPointWaveTableOsc_h
 
-
+#include <Arduino.h>
 ///////////////////////////////////////////////////////////////
 // https://embeddedartistry.com/blog/2018/7/9/template-rayb2 //
 ///////////////////////////////////////////////////////////////
 #define FPFB 16
-inline double fixed_to_float(int32_t input)
+inline double IRAM_ATTR fixed_to_float(int32_t input)
 {
 	return ((double)input / (double)(1 << FPFB));
 }
 
 
-inline int32_t float_to_fixed(double input)
+inline int32_t IRAM_ATTR float_to_fixed(double input)
 {
 	return (int32_t)(input * (1 << FPFB));
 
 }
 
 
-class FixedPointWaveTableOsc {
+IRAM_ATTR class FixedPointWaveTableOsc {
 public:
 	FixedPointWaveTableOsc(void) {
 		for (int idx = 0; idx < numWaveTableSlots; idx++) {

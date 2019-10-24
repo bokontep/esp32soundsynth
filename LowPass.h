@@ -1,5 +1,6 @@
 #ifndef LowPass_h
 #define LowPass_h
+#include <Arduino.h>
 #include "Num.h"
 using namespace Fixie;
 /*
@@ -13,7 +14,7 @@ out = buf1;
 Taken from mozzi
 */
 
-class LowPass {
+IRAM_ATTR class LowPass {
 public:
     LowPass() {
         
@@ -23,9 +24,13 @@ public:
     }
     void SetParameters(Num f, Num q)
     {
+        if(f==Num(1))
+        {
+          f = Num(0.999);
+        }
         this->f = f;
         this->q = q;
-        fb = q + q/(Num(1.0) - f);
+        fb = q + q/(Num(1) - f);
     }
     
     Num Process(Num in)

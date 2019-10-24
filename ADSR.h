@@ -18,9 +18,10 @@
 
 #ifndef ADSR_h
 #define ADSR_h
+#include <Arduino.h>
 #include "Num.h"
 using namespace Fixie;
-class ADSR {
+IRAM_ATTR class  ADSR {
 public:
 	ADSR(void);
 	~ADSR(void);
@@ -34,7 +35,10 @@ public:
     void SetDecay(Num decay);
     void SetRelease(Num release);
 	void SetSustain(Num level);
-
+    Num getAttack(){return attack;}
+    Num getDecay(){return decay;}
+    Num getSustain(){return sustainLevel;}
+    Num getRelease(){return release;}
     void Reset(void);
 
     enum envState {

@@ -21,11 +21,12 @@
 
 #ifndef NumWaveTableOsc_h
 #define NumWaveTableOsc_h
+#include <Arduino.h>
 #include "Num.h"
 #include "Util.h"
 using namespace Fixie;
 
-class NumWaveTableOsc {
+class IRAM_ATTR NumWaveTableOsc {
 public:
     NumWaveTableOsc(void) {
         for (int idx = 0; idx < numWaveTableSlots; idx++) {
@@ -114,7 +115,7 @@ public:
     //
     // returns the current oscillator output
     //
-    Fixie::Num GetOutputMinusOffset() {
+    Num GetOutputMinusOffset() {
         waveTable *waveTable = &mWaveTables[mCurWaveTable];
         Num len = waveTable->waveTableLen;
         int8_t *wave = waveTable->waveTable;
@@ -150,6 +151,19 @@ public:
     //
     
 
+    int AddSharedWaveTable(int len, int8_t *waveTableIn) {
+        if (mNumWaveTables < numWaveTableSlots) {
+            mWaveTables[mNumWaveTables].waveTable = waveTableIn;
+            mWaveTables[mNumWaveTables].waveTableLen = len-1;
+            
+            ++mNumWaveTables;
+
+            
+
+            return 0;
+        }
+        return mNumWaveTables;
+    }
 
     int AddWaveTable(int len, int8_t *waveTableIn) {
         if (mNumWaveTables < numWaveTableSlots) {
@@ -176,7 +190,10 @@ public:
     {
       this->mCurWaveTable = waveTableIdx%mNumWaveTables;
     }
-
+    int GetWaveTableCount()
+    {
+      return this->mNumWaveTables;
+    }
 protected:
     Num mPhasor = Num(0.0);       // phase accumulator
     Num mPhaseInc = Num(0.0);     // phase increment
@@ -190,7 +207,7 @@ protected:
         Num waveTableLen;
         int8_t *waveTable;
     };
-    static constexpr int numWaveTableSlots = 8;    // simplify allocation with reasonable maximum
+    static constexpr int numWaveTableSlots = 256;    // simplify allocation with reasonable maximum
     waveTable mWaveTables[numWaveTableSlots];
 };
 

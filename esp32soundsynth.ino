@@ -2,23 +2,47 @@
 #include "WiFi.h"
 #include <Arduino.h>
 #include <U8g2lib.h>
-
+#include "LowPass.h"
 #ifdef U8X8_HAVE_HW_SPI
 #include <SPI.h>
 #endif
 #ifdef U8X8_HAVE_HW_I2C
 #include <Wire.h>
 #endif
-
+#include "FileIO.h"
 #include <HardwareSerial.h>
 #include "SynthVoice.h"
 #define ANALOG_IN 36
 
 // specify the board to use for pinout
 //#define TTGO16MPROESP32OLED
+#define ESP32TTGO_T8_V1_7
+#ifdef ESP32TTGO_T8_V1_7
+#define LED 21
+#define MIDIRX 22
+#define MIDITX 19
+#endif
 
-#define ESP32DEVKIT1_DOIT
+#define IIC_1604_DISPLAY
+#ifdef IIC_1604_DISPLAY
+#define IIC_SDA_PIN 14
+#define IIC_SCL_PIN 27
+
+#include <LiquidCrystal_I2C.h>
+
+int lcdColumns = 16;
+int lcdRows = 2;
+
+
+#endif
 //#define ESP32DEVKIT1_DOIT
+//#define ESP32DEVKIT1_DOIT
+#ifdef ESP32TTGO_T8_V1_1
+
+#define LED 2
+#define MIDIRX 16
+#define MIDITX 17
+#endif
 #ifdef ESP32DEVKIT1_DOIT
 #define LED 2
 #define MIDIRX 16
@@ -52,6 +76,9 @@ HardwareSerial hSerial(2);
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 16,15,4);
 #endif
+
+char buf0[17]= "               \0";
+char buf1[17]= "               \0";
 int8_t fp_sinWaveTable[WTLEN];
 int8_t fp_sawWaveTable[WTLEN];
 int8_t fp_triWaveTable[WTLEN];
@@ -68,8 +95,17 @@ double f = 22.5;
 int notes[] = {0,3,5,12,15,17,24,27,29};
 int notelen = 9;
 int noteidx = 0;
+LowPass lowpass;
 int voices_notes[NUM_VOICES];
 int drums_notes[NUM_DRUMS];
+
+enum controller_states{CS_OSC=0, CS_ENV,CS_AMP,CS_FIL};
+int controller_state = CS_OSC;
+uint8_t knob_values[4][8]; //first is state, second is knob; 
+int value_pickup[8] = {0,0,0,0,0,0,0,0};
+uint8_t ffreq = 127;
+uint8_t fq = 0;
+unsigned long lastUpdateScreenTime;
 void initFpSin()
 {
   for(int i=0;i<WTLEN;i++)
@@ -182,9 +218,11 @@ void IRAM_ATTR onTimer() {
 TaskHandle_t Task1;
 void setup()
 {
-  
+  //formatFat();
   WiFi.mode(WIFI_OFF);
   btStop();
+
+  //lcd.write((const uint8_t*)"SYNTH (C)2019");
   console.begin(57600,SERIAL_8N1);
   //hSerial.setRxBufferSize(1);
 #ifndef NOMIDI
@@ -241,6 +279,7 @@ void setup()
     
     
     voices[i].SetOsc2ADSR(10,1,1.0,1000);
+    lastUpdateScreenTime=millis();
   }
   /*
   for(int i=0;i<NUM_DRUMS;i++)
@@ -267,10 +306,11 @@ void setup()
 
   /* Start an alarm */
   timerAlarmEnable(timer);
-  #ifdef TTGO16MPROESP32OLED
+  //#ifdef TTGO16MPROESP32OLED
     //Serial.println("stalnrt timer");
   xTaskCreatePinnedToCore(displayData,"displayData",20000,NULL,1,&Task1,0);
-  #endif
+  //#endif
+   
 }
 
 
@@ -278,6 +318,17 @@ void setup()
 
 void printMidiMessage(uint8_t command, uint8_t data1, uint8_t data2)
 {
+  unsigned long now = millis();
+  
+  sprintf(buf0,"MIDI RX:%02X:%02X:%02X\0",command,data1,data2);
+  if(now-lastUpdateScreenTime<200)
+  {
+    return;
+  }
+  
+    
+    
+
   console.print("MIDI DATA:");
   console.print(command);
   console.print(":");
@@ -285,6 +336,7 @@ void printMidiMessage(uint8_t command, uint8_t data1, uint8_t data2)
   console.print(":");
   console.println(data2);
   console.flush();
+
 }
 void testChords()
 {
@@ -304,7 +356,6 @@ void testChords()
       {
         int root = random(40,60);
         console.println("noteon");
-        if(noteidx>=notelen)
         {
           noteidx=0;
         }
@@ -427,7 +478,7 @@ void handlePitchBend(byte channel, byte bendlsb, byte bendmsb)
     }
   }
 }
-void handleCC(byte channel, byte cc, byte data)
+void handleCC(byte channel, byte cc, byte data, int* vpickup)
 {
   switch(cc)
   {
@@ -457,10 +508,207 @@ void handleCC(byte channel, byte cc, byte data)
         voices[i].MidiOsc1Wave(data);
       }
     break;
+    case 91: //ROTARY 1 ON UMX490
+      handleRotaryData(0, controller_state,data,vpickup); 
+    break;
+    case 93: //ROTARY 2 ON UMX490
+      handleRotaryData(1, controller_state,data,vpickup);
+    break;
+    case 74: //ROTARY 3 ON UMX490
+      handleRotaryData(2, controller_state,data,vpickup);
+    break;
+    case 71: //ROTARY 4 ON UMX490
+      handleRotaryData(3, controller_state,data,vpickup);
+    break;
+    case 73: //ROTARY 5 ON UMX490
+      handleRotaryData(4, controller_state,data,vpickup);
+    break;
+    case 75: //ROTARY 6 ON UMX490
+      handleRotaryData(5, controller_state,data,vpickup);
+    break;
+    case 72: //ROTARY 7 ON UMX490
+      handleRotaryData(6, controller_state,data,vpickup);
+    break;
+    case 10: //ROTARY 8 ON UMX490
+      handleRotaryData(7, controller_state,data,vpickup);
+    break;
+    case 97: //button 1 on UMX490
+      controller_state = CS_OSC;
+      for(int i=0;i<8;i++)
+      {
+        vpickup[i] = 1;  
+      }
+      
+    break;
+    case 96: //button 2 on UMX490
+      controller_state = CS_ENV;
+      for(int i=0;i<8;i++)
+      {
+        vpickup[i] = 1;  
+      }
+    break;
+    case 66: //button 3 on UMX490
+      controller_state = CS_AMP;
+      for(int i=0;i<8;i++)
+      {
+        vpickup[i] = 1;  
+      }
+    break;
+    case 67: //button 4 on UMX490
+      controller_state = CS_FIL;
+      for(int i=0;i<8;i++)
+      {
+        vpickup[i] = 1;  
+      }
+    break;
   }
     
   
 }
+
+void handleRotaryData(int rotary, int state, byte data, int* value_pickup)
+{
+  int diff = knob_values[state][rotary]-data;
+  if((diff>3 || diff<-3) && value_pickup[rotary] == 1)
+  {
+    return;
+  }
+  else
+  {
+    value_pickup[rotary] = 0;  
+  }
+  knob_values[state][rotary] = data;
+  switch(state)
+  {
+    
+    case CS_OSC:
+      switch(rotary)
+      {
+        case 0:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            int divisor = 127/voices[i].GetOsc1WaveTableCount();
+            voices[i].MidiOsc1Wave(data/divisor);
+          }
+        break;
+        case 1:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetFmod1(data);
+          }
+        break;
+        case 2:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1PhaseOffset(data);
+          }
+          break;
+        case 4:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            int divisor = 127/voices[i].GetOsc2WaveTableCount();
+            voices[i].MidiOsc2Wave(data/divisor);
+          }
+        case 5:
+        {
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+        
+            voices[i].SetFmod2(data);
+            
+          }
+        }
+        case 6:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2PhaseOffset(data);
+          }
+          break;
+        case 7:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetFmod3(data);
+          }
+        break;
+      }
+    break;
+    case CS_ENV:
+      switch(rotary)
+      {
+      case 0:
+        for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1ADSR(knob_values[CS_ENV][0],knob_values[CS_ENV][1],knob_values[CS_ENV][2],knob_values[CS_ENV][3]);
+          }
+      break;
+      case 1:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1ADSR(knob_values[CS_ENV][0],knob_values[CS_ENV][1],knob_values[CS_ENV][2],knob_values[CS_ENV][3]);
+          }
+      break;
+      case 2:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1ADSR(knob_values[CS_ENV][0],knob_values[CS_ENV][1],knob_values[CS_ENV][2],knob_values[CS_ENV][3]);
+          }
+      break;
+      case 3:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc1ADSR(knob_values[CS_ENV][0],knob_values[CS_ENV][1],knob_values[CS_ENV][2],knob_values[CS_ENV][3]);
+          }
+      break;
+      case 4:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2ADSR(knob_values[CS_ENV][4],knob_values[CS_ENV][5],knob_values[CS_ENV][6],knob_values[CS_ENV][7]);
+          }
+      break;
+      case 5:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2ADSR(knob_values[CS_ENV][4],knob_values[CS_ENV][5],knob_values[CS_ENV][6],knob_values[CS_ENV][7]);
+          }
+      break;
+      case 6:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2ADSR(knob_values[CS_ENV][4],knob_values[CS_ENV][5],knob_values[CS_ENV][6],knob_values[CS_ENV][7]);
+          }
+      break;
+      case 7:
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetOsc2ADSR(knob_values[CS_ENV][4],knob_values[CS_ENV][5],knob_values[CS_ENV][6],knob_values[CS_ENV][7]);
+          }
+      break;
+      }
+    break;
+    case CS_AMP:
+    break;
+    case CS_FIL:
+      switch(rotary)
+      {
+        case 0: // freq
+          ffreq = data;
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetFilterParameters(ffreq, fq);  
+          }
+        break;
+        case 1: // q
+          fq = data ;
+          for(int i=0;i<NUM_VOICES;i++)
+          {
+            voices[i].SetFilterParameters(ffreq, fq);
+          }
+        break;
+      }
+    break;
+  }
+}
+
 void displayData(void * parameter)
 {
   #ifdef TTGO16MPROESP32OLED
@@ -487,6 +735,28 @@ void displayData(void * parameter)
   
   }
   #endif
+  #ifdef IIC_1604_DISPLAY
+  LiquidCrystal_I2C lcd(0x27,20,2);
+  lcd.init(IIC_SDA_PIN,IIC_SCL_PIN);
+  lcd.backlight();
+  //const uint8_t* msg = (uint8_t*)("hello\n");
+  //lcd.write(msg);
+  lcd.setCursor(0,0);
+  lcd.print("ESP32SYNTH");
+  lcd.setCursor(0,1);
+  lcd.print("BOKONTEP2019"); 
+  delay(2000);
+  while(true)
+  {
+    lcd.setCursor(0,0);
+    lcd.print(buf0);
+    lcd.setCursor(0,1);
+    lcd.print(buf1);
+    delay(100);
+  }
+  #endif
+
+
 }
 void loop()
 {
@@ -505,7 +775,7 @@ void loop()
 }
 void scanMidi()
 {
-
+  
   pinMode(LED,OUTPUT);
   if(firsttime)
   {
@@ -598,7 +868,7 @@ void scanMidi()
           mstate = WAIT_COMMAND;
           break;
           case 3:
-          handleCC(channel, data1, data2);
+          handleCC(channel, data1, data2,&value_pickup[0]);
           mstate = WAIT_COMMAND;
           break;
           case 6:
@@ -611,4 +881,8 @@ void scanMidi()
     return;
   }
   
+}
+
+loadParameters()
+{
 }
