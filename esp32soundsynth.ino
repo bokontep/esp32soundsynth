@@ -1,7 +1,8 @@
 //#include <MIDI.h>
 #include "WiFi.h"
 #include <Arduino.h>
-#include <U8g2lib.h>
+
+//#include <U8g2lib.h>
 #include "LowPass.h"
 #ifdef U8X8_HAVE_HW_SPI
 #include <SPI.h>
@@ -9,6 +10,7 @@
 #ifdef U8X8_HAVE_HW_I2C
 #include <Wire.h>
 #endif
+
 #include "FileIO.h"
 #include <HardwareSerial.h>
 #include "SynthVoice.h"
@@ -16,14 +18,42 @@
 // specify the board to use for pinout
 //#define GENERIC
 //#define TTGO16MPROESP32OLED
-#define ESP32TTGO_T8_V1_7
+//#define ESP32TTGO_T8_V1_7
+
+#define ESP32TTGO_T2
+#ifdef ESP32TTGO_T2
+#include <TFT_eSPI.h>
+#include <SPI.h>
+#ifndef TFT_DISPOFF
+#define TFT_DISPOFF 0x28
+#endif
+
+#ifndef TFT_SLPIN
+#define TFT_SLPIN   0x10
+#endif
+
+#define TFT_MOSI            19
+#define TFT_SCLK            18
+#define TFT_CS              5
+#define TFT_DC              16
+#define TFT_RST             23
+
+#define TFT_BL          4  // Display backlight control pin
+#define ADC_EN          14
+#define ADC_PIN         34
+#define LED 21
+#define MIDIRX 13
+#define MIDITX 12
+
+#endif
+
 #ifdef ESP32TTGO_T8_V1_7
 #define LED 21
 #define MIDIRX 22
 #define MIDITX 19
 #endif
 
-#define IIC_1604_DISPLAY
+//#define IIC_1604_DISPLAY
 #ifdef IIC_1604_DISPLAY
 #define IIC_SDA_PIN 14
 #define IIC_SCL_PIN 27
@@ -62,8 +92,8 @@ int lcdRows = 2;
 #define RED_BUTTON 4
 
 #define YELLOW_BUTTON 2
-#define AUDIOBUFSIZE 64000
-#define SAMPLE_RATE 14000
+
+#define SAMPLE_RATE 8000
 #define NUM_VOICES 4
 #define NUM_DRUMS 0
 #define WTLEN 256
@@ -76,7 +106,14 @@ HardwareSerial hSerial(2);
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 16,15,4);
 #endif
-
+#ifdef ESP32TTGO_T2
+    TFT_eSPI tft = TFT_eSPI(135, 240); 
+    TFT_eSprite img = TFT_eSprite(&tft); 
+    const int numlines=6;
+    char line[numlines][17];
+    volatile int currline=-1;
+    
+#endif
 char buf0[17]= "               \0";
 char buf1[17]= "               \0";
 int8_t fp_sinWaveTable[WTLEN];
@@ -89,8 +126,9 @@ uint8_t dwfbuf_l[128];
 uint8_t dwfbuf_r[128];
 char line1[17];
 char line2[17];
+
 uint8_t dwfidx=0;
-uint8_t audio_buffer[AUDIOBUFSIZE];
+
 double f = 22.5;
 int notes[] = {0,3,5,12,15,17,24,27,29};
 int notelen = 9;
@@ -109,7 +147,7 @@ void initFpSin()
 {
   for(int i=0;i<WTLEN;i++)
   {
-    fp_sinWaveTable[i] = (int8_t)(127*(sin(2*(PI/(float)WTLEN)*i)));
+    fp_sinWaveTable[i] = (int8_t)(((WTLEN-1)/2.0)*(sin(2*(PI/(float)WTLEN)*i)));
   }
   return;
 }
@@ -118,11 +156,11 @@ void initFpTri()
 {
   for(int i=0;i<128;i++)
   {
-    fp_triWaveTable[i] = (int8_t)(127.0*(-1.0+i*(1.0/((double)WTLEN/2.0))));
+    fp_triWaveTable[i] = (int8_t)(((WTLEN+1)/2.0)*(-1.0+i*(1.0/((double)WTLEN/2.0))));
   }
   for(int i=128;i<256;i++)
   {
-    fp_triWaveTable[i] = (int8_t)(127.0*(1.0 - i*(1.0/((double)WTLEN/2.0))));
+    fp_triWaveTable[i] = (int8_t)(((WTLEN+1)/2.0)*(1.0 - i*(1.0/((double)WTLEN/2.0))));
   }
   
 }
@@ -138,7 +176,7 @@ void initFpSaw()
 {
   for(int i = 0;i<256;i++)
   {
-    fp_sawWaveTable[i] = (int8_t)(127*(-1.0 + (2.0/WTLEN)*i));
+    fp_sawWaveTable[i] = (int8_t)((WTLEN/2)*(-1.0 + (2.0/WTLEN)*i));
   }
   
 }
@@ -255,29 +293,23 @@ void setup()
   for(int i =0;i<NUM_VOICES;i++)
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
+    
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sinWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_plsWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_rndWaveTable[0]);
-
-    
-    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
     voices[i].SetOsc1ADSR(10,1,1.0,1000);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_sinWaveTable[0]);
-    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
     
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_sinWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_plsWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_rndWaveTable[0]);
-
-    
-    
-    
     voices[i].SetOsc2ADSR(10,1,1.0,1000);
+
     lastUpdateScreenTime=millis();
   }
   /*
@@ -384,6 +416,18 @@ enum midistate{WAIT_COMMAND,WAIT_DATA1,WAIT_DATA2};
 bool firsttime = true;
 midistate mstate=WAIT_COMMAND;
 byte rotaries[4][8];
+#ifdef ESP32TTGO_T2
+  void writeTFTLine(char* text)
+  {
+    currline++;
+    int newidx = (currline%numlines);
+    sprintf(&line[newidx][0],"%s",text);
+    
+    
+    
+  }
+
+#endif
 void handleNoteOn(byte channel, byte note, byte velocity)
 {
   char buf[17];
@@ -391,6 +435,14 @@ void handleNoteOn(byte channel, byte note, byte velocity)
   int maxnote = -1;
   int maxnoteidx = -1;
   digitalWrite(LED,HIGH);
+  sprintf(buf, "note:%03d vel:%03d",note, velocity);
+  strcpy(line1,buf);
+  strcpy(line2,"");
+  #ifdef ESP32TTGO_T2
+    writeTFTLine(buf);
+  #endif
+  
+  
   if(channel !=10)
   {
     for(int i=0;i<NUM_VOICES;i++)
@@ -398,10 +450,7 @@ void handleNoteOn(byte channel, byte note, byte velocity)
       if(voices_notes[i]==-1)
       {
         voices_notes[i]=note;
-        sprintf(buf, "note:%d vel:%d",note, velocity);
-        strcpy(line1,buf);
-        strcpy(line2,"");
-        
+
         voices[i].MidiNoteOn(note,velocity);
         found = true;
         return;
@@ -422,6 +471,7 @@ void handleNoteOn(byte channel, byte note, byte velocity)
       if(drums_notes[i]==-1)
       {
         drums_notes[i]=note;
+        
         drums[i].MidiNoteOn(note,velocity);
         found = true;
         return;
@@ -439,6 +489,13 @@ void handleNoteOn(byte channel, byte note, byte velocity)
 }
 void handleNoteOff(byte channel, byte note, byte velocity)
 {
+  char buf[17];
+  sprintf(buf, "note:%03d vel:%03d",note, velocity);
+  strcpy(line1,buf);
+  strcpy(line2,"");
+  #ifdef ESP32TTGO_T2
+    writeTFTLine(buf);
+  #endif
   if(channel!=10)
   {
     digitalWrite(LED,LOW);
@@ -706,6 +763,8 @@ void handleRotaryData(int rotary, int state, byte data, int* value_pickup)
     break;
   }
 }
+
+
 void displayData(void * parameter)
 {
   #ifdef TTGO16MPROESP32OLED
@@ -752,7 +811,61 @@ void displayData(void * parameter)
     delay(100);
   }
   #endif
+#ifdef ESP32TTGO_T2
 
+    
+    tft.init();
+    
+    tft.setRotation(3);
+    tft.fillScreen(TFT_BLUE);
+    tft.setTextSize(2);
+    tft.setTextColor(TFT_WHITE);
+    tft.setCursor(0, 0);
+    img.setColorDepth(8);
+    img.createSprite(tft.width(),tft.height());
+    img.fillSprite(TFT_BLUE);
+    img.setTextSize(2);
+    writeTFTLine("ESP32SYNTH");
+    writeTFTLine("(C) BOKONTEP");
+    writeTFTLine("2020 ");
+    //pinMode(TFT_BL, OUTPUT);
+    while(true)
+    {
+      //sprintf(line1,"%s",buf0);
+      //sprintf(line2,"%s",buf1);
+      //img.fillScreen(TFT_BLUE);
+      img.fillSprite(TFT_BLUE);
+      img.setTextColor(TFT_WHITE);
+      if(currline<numlines)
+      {
+        for(int i=0;i<numlines;i++)
+        {
+          img.drawString(&line[i][0],0,i*15);
+        }
+      }
+      else
+      {
+        for(int i=0;i<numlines;i++)
+        {
+          int idx = (currline-i)%numlines;
+          img.drawString(&line[idx][0],0,(numlines-1-i)*15);
+        }
+      }
+      
+    
+      img.drawString(line1,0,106);
+      img.drawString(line2,0,121);
+      for (int i=0;i<127;i++)
+      {
+        img.drawLine(i*1.875,(dwfbuf_l[i])>>1,(i+1)*1.875,(dwfbuf_l[i+1])>>1,TFT_YELLOW);
+        //img.drawLine(i*1.8,(dwfbuf_r[i]>>1),i+1,(dwfbuf_r[i+1]>>1),TFT_RED);
+    
+      }
+      img.pushSprite(0,0);
+      delay(10);
+    }
+    
+#endif
 
 }
 void loop()
@@ -762,12 +875,7 @@ void loop()
   scanMidi();
   #endif
   //displayData();
-  /*
-  if(t_counter%32000==0)
-  {
-    Serial.println(avg_time_micros);
-  }
-  */
+
   
 }
 void scanMidi()
@@ -861,7 +969,14 @@ void scanMidi()
           break;
           case 1:
           printMidiMessage(command,data1,data2);
-          handleNoteOn(channel,data1,data2);
+          if(data2==0)
+          {
+            handleNoteOff(channel,data1,data2);
+          }
+          else
+          {
+            handleNoteOn(channel,data1,data2);
+          }
           mstate = WAIT_COMMAND;
           break;
           case 3:
@@ -880,6 +995,6 @@ void scanMidi()
   
 }
 
-loadParameters()
+void loadParameters()
 {
 }

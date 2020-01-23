@@ -5,10 +5,7 @@
 #include "NumWaveTableOsc.hpp"
 #include "ADSR.h"
 #include "LowPass.h"
-<<<<<<< HEAD
 #include <Arduino.h>
-=======
->>>>>>> 6d1d7593df5e85c87dca26b2b91bb45bf1406dd3
 using namespace Fixie;
 
 class IRAM_ATTR SynthVoice  {
@@ -155,13 +152,6 @@ public:
     {
       lowpass.SetParameters(filter_freq/127.0,filter_q/127.0);
     }
-<<<<<<< HEAD
-=======
-    void SetFilterParameters(uint8_t filter_freq, uint8_t filter_q)
-    {
-      lowpass.SetParameters(filter_freq/127.0,filter_q/127.0);
-    }
->>>>>>> 6d1d7593df5e85c87dca26b2b91bb45bf1406dd3
     Num Process()
     {
       if(modulation==Num(0))
@@ -197,11 +187,8 @@ protected:
     Num ffreq;
     Num fq;
     LowPass lowpass;
-<<<<<<< HEAD
     uint8_t wt1_idx;
     uint8_t wt2_idx;
-=======
->>>>>>> 6d1d7593df5e85c87dca26b2b91bb45bf1406dd3
 };
 
 #endif
